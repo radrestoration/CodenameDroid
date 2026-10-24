@@ -22,7 +22,7 @@ SRC = os.path.join(HERE, "..", "bbc", "src")
 ZP_MOVE = 0xe4            # $00-$03 (enemy_variables and everything aliased on them) -> $e4-$e7
 
 # The width of the game's window in cells, which is also the row length of its screen buffer ("the ring"): the BBC's
-# 32, or 40 to fill the C64's screen. WIDE=40 is the default: see README.md.
+# 32, or 40 to fill the C64's screen. WIDE=40 is the default: see C64-README.md.
 WIDE = int(os.environ.get("WIDE", "32"))
 assert WIDE in (32, 40), WIDE
 # WIDE_PATCH=1 applies the geometry patches also at 32 columns (the tests use that to show the patches keep the game

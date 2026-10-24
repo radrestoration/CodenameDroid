@@ -1,4 +1,4 @@
-# Codename Droid, C64 port; see README.md. The BBC game it runs is in bbc/ (built into build/bbc by `make -C bbc`).
+# Codename Droid, C64 port; see README.md and C64-README.md. The BBC game it runs is in bbc/ (built into build/bbc by `make -C bbc`).
 -include tools.cfg
 tilde = $(patsubst ~%,$(HOME)%,$(1))
 ifneq ($(strip $(CC65_HOME)),)
@@ -30,7 +30,7 @@ help:
 	@echo "make WIDE=32      the same with the BBC's 32-cell window (into the same directory)"
 	@echo "make test         the checks in the headless 6502 simulator (make test WIDE=32 for the 32-cell build's)"
 	@echo "make levels       render the 12 levels to build/c64/levels/*.png"
-	@echo "make zip         build/c64/codename-droid-c64.zip: the PRG, the disk image, a VICE run script and a README"
+	@echo "make zip         build/c64/codename-droid-c64.zip: the PRG, the disk image, a VICE run script and README.md"
 	@echo "make clean        remove build/c64 (build/bbc is the BBC game's: make -C bbc clean)"
 
 # the BBC game rebuilt first (its disc.lbl and CDroid4 are what the tools read)
@@ -80,7 +80,7 @@ test: $(B)/droid.prg
 
 ZIP := $(B)/codename-droid-c64$(if $(filter 32,$(WIDE)),-narrow).zip
 
-zip: $(B)/droid.prg tools/make_zip.py tools/dist_run.sh tools/dist_readme.txt
+zip: $(B)/droid.prg tools/make_zip.py tools/dist_run.sh README.md
 	$(PYTHON) -I tools/make_zip.py $(B) $(ZIP)
 
 clean:

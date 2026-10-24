@@ -35,7 +35,7 @@ installed cc65 nothing is needed) and python3. No beebasm needed.
 
 ## C64 port
 
-The C64 port, which runs this game's own code with a C64 display layer, is in the directory above (`../README.md`). It has been checked
+The C64 port, which runs this game's own code with a C64 display layer, is in the directory above (`../C64-README.md`). It has been checked
 in a headless simulator only, not on a C64 or in VICE.
 
 ## Layout
