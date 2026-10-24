@@ -27,7 +27,7 @@ https://bbcmicro.co.uk/game.php?id=564
 
 ## Download
 
-See [downloads] dir. 
+[Download the C64 version (zip)](downloads/codename-droid-c64.zip)
 
 ## Commodore 64 Port Notes
 
