@@ -1,0 +1,155 @@
+1109-110b patch     after main_game_loop+0
+1201-1201 patch     after is_top_two_tiles+2
+120e-1211 patch     after is_top_two_tiles+15
+13d3-13d4 patch     after skip_page_13cc+7
+13ef-13f0 patch     after skip_wraparound_13e5+10
+18cf-18d2 patch     after plot_column_of_tiles+0
+1a28-1a2b patch     after plot_row_of_tiles+0
+1bfd-1c00 patch     after plot_sprite_skipping_offset+0
+26d3-26d4 patch     after play_sound_volume_X_pitch_Y_duration_A+16
+26ed-26ee patch     after variable_delay+0
+2704-2705 patch     after set_crtc_address+0
+2708-2708 patch     after set_crtc_address+4
+270a-270a patch     after set_crtc_address+6
+270d-2717 patch     after set_crtc_address+9
+271c-271d patch     after wait_for_vsync+3
+2725-2726 patch     after to_game_over_screen+1
+278e-278e zero page $00-$03 moved to $e4-$e7 after get_enemy_variables_loop+3
+2797-2797 zero page $00-$03 moved to $e4-$e7 after get_enemy_variables_loop+12
+27a2-27a2 zero page $00-$03 moved to $e4-$e7 after get_enemy_variables_loop+23
+27a6-27a6 zero page $00-$03 moved to $e4-$e7 after get_enemy_variables_loop+27
+27a8-27a8 zero page $00-$03 moved to $e4-$e7 after get_enemy_variables_loop+29
+27b3-27b3 zero page $00-$03 moved to $e4-$e7 after get_enemy_variables_loop+40
+27c5-27c5 zero page $00-$03 moved to $e4-$e7 after get_enemy_variables_loop+58
+27c9-27c9 zero page $00-$03 moved to $e4-$e7 after get_enemy_variables_loop+62
+27cb-27cb zero page $00-$03 moved to $e4-$e7 after get_enemy_variables_loop+64
+27ec-27ec zero page $00-$03 moved to $e4-$e7 after not_skeleton_27e0+12
+27f2-27f2 zero page $00-$03 moved to $e4-$e7 after not_skeleton_27e0+18
+280d-280d zero page $00-$03 moved to $e4-$e7 after skip_wraparound_2808+5
+280f-280f zero page $00-$03 moved to $e4-$e7 after skip_wraparound_2808+7
+2813-2813 zero page $00-$03 moved to $e4-$e7 after skip_wraparound_2808+11
+281b-281b zero page $00-$03 moved to $e4-$e7 after skip_wraparound_2808+19
+281e-281e zero page $00-$03 moved to $e4-$e7 after skip_removing_skeleton+2
+2820-2820 zero page $00-$03 moved to $e4-$e7 after skip_removing_skeleton+4
+2826-2826 zero page $00-$03 moved to $e4-$e7 after set_enemy_variables_loop+1
+283d-283d zero page $00-$03 moved to $e4-$e7 after set_enemy_variables_loop+24
+2877-2877 zero page $00-$03 moved to $e4-$e7 after consider_plotting_enemy+5
+287f-287f zero page $00-$03 moved to $e4-$e7 after consider_plotting_enemy+13
+2884-2884 zero page $00-$03 moved to $e4-$e7 after not_new_tile+1
+288a-288a zero page $00-$03 moved to $e4-$e7 after is_stationary_or_skeleton+1
+288c-288c zero page $00-$03 moved to $e4-$e7 after is_stationary_or_skeleton+3
+2894-2894 zero page $00-$03 moved to $e4-$e7 after is_stationary_or_skeleton+11
+289e-289e zero page $00-$03 moved to $e4-$e7 after skip_wraparound_2895+9
+28aa-28aa zero page $00-$03 moved to $e4-$e7 after skip_wraparound_2895+21
+28b2-28b2 zero page $00-$03 moved to $e4-$e7 after is_facing_right_28af+3
+28bd-28bd zero page $00-$03 moved to $e4-$e7 after is_facing_left_28b7+6
+28e4-28e4 zero page $00-$03 moved to $e4-$e7 after crop_to_left+16
+28ea-28ea zero page $00-$03 moved to $e4-$e7 after crop_to_left+22
+291b-291b zero page $00-$03 moved to $e4-$e7 after not_visible+1
+2932-2932 zero page $00-$03 moved to $e4-$e7 after skip_cropping+1
+2934-2934 zero page $00-$03 moved to $e4-$e7 after skip_cropping+3
+293f-293f zero page $00-$03 moved to $e4-$e7 after skip_cropping+14
+294c-294c zero page $00-$03 moved to $e4-$e7 after unplot_left_edge_of_enemy+1
+2979-2979 zero page $00-$03 moved to $e4-$e7 after unplot_right_edge_of_enemy+1
+299e-299e zero page $00-$03 moved to $e4-$e7 after move_and_plot_enemy_without_unplotting+1
+29a5-29a5 zero page $00-$03 moved to $e4-$e7 after plot_enemy+1
+29a7-29a7 zero page $00-$03 moved to $e4-$e7 after plot_enemy+3
+29af-29af zero page $00-$03 moved to $e4-$e7 after plot_enemy+11
+29b5-29b5 zero page $00-$03 moved to $e4-$e7 after is_facing_right_29b4+1
+29cc-29cc zero page $00-$03 moved to $e4-$e7 after is_facing_left_29cb+1
+29ec-29ec zero page $00-$03 moved to $e4-$e7 after consider_clearing_skeleton+7
+2a0f-2a0f zero page $00-$03 moved to $e4-$e7 after consider_clearing_skeleton+42
+2a40-2a40 zero page $00-$03 moved to $e4-$e7 after skip_clearing_skeleton+11
+2c5e-2c5e zero page $00-$03 moved to $e4-$e7 after check_for_enemy_collision_with_mines+1
+2c65-2c65 zero page $00-$03 moved to $e4-$e7 after not_skeleton_2c64+1
+2c71-2c71 zero page $00-$03 moved to $e4-$e7 after not_skeleton_2c64+13
+2c77-2c77 zero page $00-$03 moved to $e4-$e7 after is_facing_right_2c76+1
+2c7c-2c7c zero page $00-$03 moved to $e4-$e7 after is_facing_right_2c76+6
+2c85-2c85 zero page $00-$03 moved to $e4-$e7 after is_facing_left_2c84+1
+2c8a-2c8a zero page $00-$03 moved to $e4-$e7 after is_facing_left_2c84+6
+2d21-2d21 zero page $00-$03 moved to $e4-$e7 after consider_enemy_firing+6
+2d31-2d32 patch     after is_within_range_vertically+1
+2d38-2d38 zero page $00-$03 moved to $e4-$e7 after is_within_range_vertically+8
+2d46-2d46 zero page $00-$03 moved to $e4-$e7 after not_skeleton_2d3e+8
+2d49-2d49 zero page $00-$03 moved to $e4-$e7 after not_skeleton_2d3e+11
+2d52-2d52 zero page $00-$03 moved to $e4-$e7 after is_facing_left_2d4e+4
+2d57-2d57 zero page $00-$03 moved to $e4-$e7 after is_facing_right_2d54+3
+2d7b-2d7b zero page $00-$03 moved to $e4-$e7 after found_slot_2d7a+1
+2d81-2d81 zero page $00-$03 moved to $e4-$e7 after found_slot_2d7a+7
+2e30-2e30 zero page $00-$03 moved to $e4-$e7 after collided_with_player+1
+2f1b-2f1b zero page $00-$03 moved to $e4-$e7 after is_enemy+1
+2f3b-2f3b zero page $00-$03 moved to $e4-$e7 after is_enemy+33
+2f42-2f42 zero page $00-$03 moved to $e4-$e7 after is_enemy+40
+2f61-2f62 patch     after set_palette+5
+2ff7-2ff8 patch     after wrist_terminal_screen_loop+4
+31c1-31c1 zero page $00-$03 moved to $e4-$e7 after write_game_over_loop+47
+31c5-31c5 zero page $00-$03 moved to $e4-$e7 after write_game_over_loop+51
+3230-3231 patch     after title_screen+1
+3270-3270 zero page $00-$03 moved to $e4-$e7 after skip_wraparound_326b+5
+32ed-32ee patch     after f1_not_pressed_32d5+24
+33bc-33bc patch     after scroll_right_for_count+0
+33c9-33ca patch     after scroll_right_for_count_loop+1
+33d4-33d4 patch     after scroll_right_for_count_loop+12
+33fd-33fd zero page $00-$03 moved to $e4-$e7 after initialise_levels_loop+4
+3402-3402 zero page $00-$03 moved to $e4-$e7 after initialise_levels_loop+9
+3407-3407 zero page $00-$03 moved to $e4-$e7 after initialise_levels_loop+14
+3467-3467 zero page $00-$03 moved to $e4-$e7 after write_map_text_loop+23
+347f-347f zero page $00-$03 moved to $e4-$e7 after plot_enemies_on_map_loop+1
+3487-3487 zero page $00-$03 moved to $e4-$e7 after plot_enemies_on_map_loop+9
+34ad-34ad zero page $00-$03 moved to $e4-$e7 after consider_next_enemy+10
+34b1-34b1 zero page $00-$03 moved to $e4-$e7 after consider_next_enemy+14
+34f7-34f7 zero page $00-$03 moved to $e4-$e7 after skip_wraparound_34f2+5
+34fe-34fe zero page $00-$03 moved to $e4-$e7 after next_tile+1
+3502-3502 zero page $00-$03 moved to $e4-$e7 after next_tile+5
+3585-3586 patch     after update_tune+7
+3628-3629 patch     after play_sound_on_channel_A_volume_X_pitch_Y+16
+37d5-37d5 zero page $00-$03 moved to $e4-$e7 after plot_level_name+3
+37d9-37d9 zero page $00-$03 moved to $e4-$e7 after plot_level_name+7
+37e8-37e8 zero page $00-$03 moved to $e4-$e7 after find_start_of_name+1
+37f2-37f2 zero page $00-$03 moved to $e4-$e7 after plot_name_loop+1
+382d-382e patch     after flush_buffers+5
+3852-3853 patch     after prepare_status_screen+1
+38d3-38e5 patch     after clear_screen+0
+3933-3936 patch     after plot_unflipped_player+0
+39a9-39ac patch     after plot_flipped_player+0
+3a27-3a2a patch     after plot_flipped_enemy+0
+3b0f-3b0f zero page $00-$03 moved to $e4-$e7 after update_gargoyles_loop+1
+3b31-3b31 zero page $00-$03 moved to $e4-$e7 after consider_next_gargoyle+1
+3b3b-3b3d patch     after initialise_variables+0
+3b3f-3b3f patch     after wipe_0000_to_009f_loop+1
+3b42-3b42 patch     after wipe_0000_to_009f_loop+4
+3bcc-3bcf patch     after update_chandeliers+0
+3bd3-3bd3 zero page $00-$03 moved to $e4-$e7 after update_chandeliers+7
+3bd5-3bd5 zero page $00-$03 moved to $e4-$e7 after update_chandeliers+9
+3bd7-3bd7 zero page $00-$03 moved to $e4-$e7 after update_chandeliers+11
+3bdb-3bdb zero page $00-$03 moved to $e4-$e7 after update_chandeliers_loop+3
+3be3-3be3 zero page $00-$03 moved to $e4-$e7 after update_chandeliers_loop+11
+3be5-3be5 zero page $00-$03 moved to $e4-$e7 after update_chandeliers_loop+13
+3bea-3bea zero page $00-$03 moved to $e4-$e7 after skip_bottom_nibble+1
+3bee-3bee zero page $00-$03 moved to $e4-$e7 after skip_bottom_nibble+5
+3bf8-3bf8 zero page $00-$03 moved to $e4-$e7 after skip_bottom_nibble+15
+3bfa-3bfa zero page $00-$03 moved to $e4-$e7 after skip_bottom_nibble+17
+3bff-3bff zero page $00-$03 moved to $e4-$e7 after skip_top_nibble+1
+3c01-3c01 zero page $00-$03 moved to $e4-$e7 after skip_top_nibble+3
+3c03-3c03 zero page $00-$03 moved to $e4-$e7 after skip_top_nibble+5
+3c0b-3c0b zero page $00-$03 moved to $e4-$e7 after skip_top_nibble+13
+3c0d-3c0d zero page $00-$03 moved to $e4-$e7 after skip_top_nibble+15
+3c0f-3c0f zero page $00-$03 moved to $e4-$e7 after skip_top_nibble+17
+3c61-3c61 zero page $00-$03 moved to $e4-$e7 after lower_pillars+35
+3ed1-3eda patch     after display_level+0
+3f24-3f2e patch     after display_level_loop+7
+3f57-3f57 zero page $00-$03 moved to $e4-$e7 after move_enemy+1
+3f66-3f66 zero page $00-$03 moved to $e4-$e7 after not_skeleton_3f5d+9
+3f6a-3f6a zero page $00-$03 moved to $e4-$e7 after move_enemy_moving_right+1
+3f6e-3f6e zero page $00-$03 moved to $e4-$e7 after move_enemy_moving_right+5
+3f75-3f75 zero page $00-$03 moved to $e4-$e7 after move_enemy_moving_right+12
+3f79-3f79 zero page $00-$03 moved to $e4-$e7 after move_enemy_moving_right+16
+3f99-3f99 zero page $00-$03 moved to $e4-$e7 after move_enemy_left_or_right+1
+3f9d-3f9d zero page $00-$03 moved to $e4-$e7 after move_enemy_right+1
+3fa0-3fa0 zero page $00-$03 moved to $e4-$e7 after move_enemy_left+1
+3fa6-3fa6 zero page $00-$03 moved to $e4-$e7 after flip_enemy_direction+4
+3faa-3faa zero page $00-$03 moved to $e4-$e7 after flip_enemy_direction+8
+3fad-3fad zero page $00-$03 moved to $e4-$e7 after move_enemy_moving_left+1
+3fb1-3fb1 zero page $00-$03 moved to $e4-$e7 after move_enemy_moving_left+5
+3fb8-3fb8 zero page $00-$03 moved to $e4-$e7 after move_enemy_moving_left+12
+3fbc-3fbc zero page $00-$03 moved to $e4-$e7 after move_enemy_moving_left+16
