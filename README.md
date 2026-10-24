@@ -7,9 +7,11 @@ This is an AI port using Claude by Rad Restoration - contact@radrestoration.com.
 
 Game has been tested in VICE and real NTSC C64 hardware. 
 
-![The title screen](screenshots/intro.png)
-
-![Game play: the surface](screenshots/play1.png)
+<p align="center">
+  <img src="screenshots/intro.png" alt="The title screen" width="30%">
+  <img src="screenshots/play1.png" alt="Game play: the surface" width="30%">
+  <img src="screenshots/play2.png" alt="Game play: soldiers and girders" width="30%">
+</p>
 
 ![Game play: soldiers and girders](screenshots/play2.png)
 
@@ -27,7 +29,7 @@ https://bbcmicro.co.uk/game.php?id=564
 
 ## Download
 
-[Download the C64 version (zip)](downloads/codename-droid-c64.zip)
+[Download the C64 version (zip)](downloads)
 
 ## Commodore 64 Port Notes
 
