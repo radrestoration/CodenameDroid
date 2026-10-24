@@ -25,6 +25,10 @@ For more on the original, see here:
 
 https://bbcmicro.co.uk/game.php?id=564
 
+## Download
+
+See [downloads] dir. 
+
 ## Commodore 64 Port Notes
 
 The game aims to be a faithful port of the original, but there are some consessions:
