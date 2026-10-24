@@ -716,10 +716,15 @@ def semantic(p):
     cpy #RING_W
     bne @col
 """ if W > 32 else ""
-    p.replace_line(5077, r"jsr scroll_right_for_count$", p.call("title_scroll", prefill + """    jsr scroll_right_for_count
+    p.replace_line(5077, r"jsr scroll_right_for_count$", p.call("title_scroll", prefill + """    lda #1
+    sta c64_hide_ok             ; (the scroll's last steps are not shown: see c64_scroll_delay)
+    jsr scroll_right_for_count
     lda #$40                    ; (use corner tiles)
     sta level_sprite_base
+    jsr c64_title_static        ; (the title's own arrangement, now that it is still)
     rts"""))
+    # leaving the title (the space bar): the title map off before the scroll onto the first level
+    p.replace_line(5165, r"jsr flush_buffers$", "    jsr c64_leave_title")
     # (the window's top left and the player's address at the start of the game: from where the title's scrolls end)
     s_start = 181 - (W - 32) // 2
     S = p.S

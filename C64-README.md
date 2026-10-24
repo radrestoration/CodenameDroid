@@ -160,6 +160,24 @@ the redraw of a level takes 40 scroll steps, not 32 (so the jet pack's energy ru
 5-10% slower than the 32-column build. The title and its intro scroll are checked against the 32-column build's
 (`test_title_final.py`, which makes that build into `build/ref32`). Not run on a C64 or in VICE.
 
+**The title screen** (WIDE=40): once the intro scroll is over, the still title is shown through a map
+(`tools/make_title_map.py`, `title_remap` in `src/cells.s`) instead of as the ring has it. The game draws a 32 x 32 cell frame
+of 4 x 4 cell squares with the text, logo, player and music icon inside; the C64 shows 40 columns and 24 rows. The map keeps
+one column of squares and its corner pieces on each side, puts two more squares in each bar and 8 cells more room in the
+middle (so the frame fills the 40 columns), leaves out two square rows (so the whole frame fits the 24 rows), and arranges the
+middle to fit: SUPERIOR PRESENTS on one line, blank rows taken out, the music icon moved right so that HIT SPACE has the bottom
+row, two blank rows between the player and HIT SPACE. The game's own title is untouched (it is still drawn
+into the ring as on the BBC: the squares are level 0's tile data seen through a corner tile set, so they cannot be changed);
+only the C64's display is rearranged. The scroll before it is the BBC's, but its last 33 steps (the old 32-cell frame sliding in) are not shown: the screen is blanked from then (`c64_scroll_delay`) until the new layout is ready (`c64_title_static`). The map is 164 segments (a run of cells of one ring row to a run of one screen row),
+unpacked at start-up; a change of any cell while it is up makes the whole matrix be made again (about 15,000 cycles, which
+the still title can afford). `test_titlemap.py` checks the matrix against the ring through the map, every frame for 120
+frames of animation; the scroll before it is the BBC's (`test_title_final.py` compares it with the 32-cell build's).
+
+The instruction pages, the credits and the controls are Huffman coded (a canonical code made by `tools/make_intro.py`,
+decoded by `intro_huff` in `src/intro.s`: about 15 frames a page): 5.3 KB instead of 7 KB with the LZ77 the pictures use.
+Data the loading screens use before the scrolling picture starts may sit in the gap at `$6600` (the picture scrolls through a
+second bitmap there); anything needed afterwards (the credits' character set, the title map) is in the tail of the PRG.
+
 ## Not verified / known gaps
 
 - **Everything on real hardware or VICE**: the VIC-II set-up, the raster wait and interrupt, the CIA reads, the PAL/NTSC

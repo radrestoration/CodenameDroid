@@ -20,6 +20,15 @@ def mismatches(c):
     vb = c.m[0xda] | c.m[0xdb] << 8
     mp = c.matrix_pixels()
     bad = 0
+    if c.m[0x22c] == 1:                         # the title shown through its map (40 cells: tools/make_title_map.py)
+        import make_title_map
+        fw = make_title_map.forward()
+        for cell, off in fw.items():
+            r, col = divmod(cell, 40)
+            exp = c.ring_cell_pixels((vb + off) % RING_CELLS)
+            if not (exp == mp[r * 8:r * 8 + 8, col * 4:col * 4 + 4]).all():
+                bad += 1
+        return bad
     for r in range(25):
         for col in range(len(mp[0]) // 4):
             exp = c.ring_cell_pixels((vb + RING_W * r + col) % RING_CELLS)

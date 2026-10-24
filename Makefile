@@ -52,7 +52,7 @@ DISC   ?= $(HOME)/retro/games/Disc032-CodenameDroidStrykersRun2.ssd
 DISC   := $(call tilde,$(DISC))
 export DISC
 
-$(GEN)/intro_data.s: tools/make_intro.py tools/mode7.py tools/detok.py $(wildcard $(DISC)) $(B)/wide
+$(GEN)/intro_data.s: tools/make_intro.py tools/mode7.py tools/make_title_map.py tools/detok.py $(wildcard $(DISC)) $(B)/wide
 	@mkdir -p $(GEN)
 	$(PYTHON) -I tools/make_intro.py $@
 

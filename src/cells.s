@@ -625,6 +625,14 @@ alloc_char:
 show_cell:
     lda zp_remap
     bne @out                    ; the matrix is about to be rebuilt anyway
+.if RING_W <> 32
+    lda c64_tmap
+    beq @notitle
+    lda #1                      ; (the title map: a cell's place is not worked out: the whole matrix is made again, which the
+    sta zp_remap                ; title screen, which hardly changes, can afford)
+    rts
+@notitle:
+.endif
     sec
     lda zp_ci
     sbc zp_vb
@@ -786,6 +794,12 @@ view_apply:
 
 ; full_remap: matrix row r (columns c64_mcol0 on, c64_vcols of them) := CELLCHAR[(vb + RING_W r) mod RING_CELLS ...]
 full_remap:
+.if RING_W <> 32
+    lda c64_tmap
+    beq @std
+    jmp title_remap
+@std:
+.endif
     lda c64_back
     sec
     sbc #>MATRIX
@@ -931,6 +945,12 @@ camera_update:
     lda c64_gamemode
     bne @game
     lda #4
+.if RING_W <> 32
+    ldx c64_tmap                ; (the title map's cells are counted from the ring window's top left)
+    beq @cam
+    lda #0
+@cam:
+.endif
     sta c64_cam
     rts
 @game:
@@ -1019,3 +1039,71 @@ camera_update:
     bcs @done
     inc c64_cam
     rts
+
+.if RING_W <> 32
+; ------------------------------------------------------------------------------------------------
+; The title screen's map (tools/make_title_map.py): the matrix shows the ring's title rearranged. TMAP_SEG has the segments in
+; screen order: a length, and the offset (from the ring window's top left) of the first of the cells they are copied from. A
+; change of any cell makes show_cell ask for the whole matrix to be made again.
+
+; title_remap: the back matrix from the segments
+title_remap:
+    lda c64_back
+    sta zp_d+1
+    lda #0
+    sta zp_d                    ; the matrix cell the segment goes to
+    lda #<TMAP_SEG
+    sta zp_p1
+    lda #>TMAP_SEG
+    sta zp_p1+1
+@seg:
+    ldy #0
+    lda (zp_p1),y
+    beq @done
+    sta zp_rx                   ; its length
+    iny
+    lda (zp_p1),y
+    clc
+    adc zp_vb
+    sta zp_idx
+    iny
+    lda (zp_p1),y
+    adc zp_vb+1
+    sta zp_idx+1
+    WRAP_CELL zp_idx            ; the ring cell it starts at
+    clc
+    lda zp_idx
+    adc #<CELLCHAR
+    sta @ld+1
+    lda zp_idx+1
+    adc #>CELLCHAR
+    sta @ld+2
+    lda zp_d
+    sta @st+1
+    lda zp_d+1
+    sta @st+2
+    ldy zp_rx
+    dey
+@ld:
+    lda $ffff,y
+@st:
+    sta $ffff,y
+    dey
+    bpl @ld
+    lda zp_d
+    clc
+    adc zp_rx
+    sta zp_d
+    bcc @n1
+    inc zp_d+1
+@n1:
+    lda zp_p1
+    clc
+    adc #3
+    sta zp_p1
+    bcc @seg
+    inc zp_p1+1
+    jmp @seg
+@done:
+    rts
+.endif

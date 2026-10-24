@@ -44,6 +44,13 @@ def matrix_ok(c):
     m = c.m
     vb = c.view_base()
     bad = []
+    if m[0x22c] == 1:                           # the title shown through its map (40 cells: tools/make_title_map.py)
+        import make_title_map
+        for cell, off in make_title_map.forward().items():
+            idx = (vb + off) % RING_CELLS
+            if m[c.display_base() + cell] != m[CELLCHAR + idx]:
+                bad.append((cell // 40, cell % 40, idx))
+        return bad
     vcols, mcol0 = m[0x215], m[0x214]
     for r in range(25):
         for col in range(vcols):

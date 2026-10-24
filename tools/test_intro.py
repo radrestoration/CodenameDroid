@@ -137,7 +137,7 @@ def main():
             bad.append(n + 1)
         if n + 1 < len(pages):
             tap(c, SPACE)
-            frames(c, 4)
+            frames(c, 30)                                  # (a page is Huffman decoded: about 15 frames)
     check(not bad, "the %d instruction pages show as expected (pages that differ: %s)" % (len(pages), bad or "none"))
     if pages:
         check(c.m[0xd018] == 0x48 and c.m[0xdd00] & 3 == 0, "text mode, screen RAM at $d000, VIC-II bank 3")
@@ -172,13 +172,13 @@ def main():
     # the digits and punctuation are the C64's (the character ROM over codes 32-63); the capitals are the front end's
     check(bytes(c.m[0xe000 + 0x30 * 8:0xe000 + 0x30 * 8 + 8]) == bytes(c.chargen[0x30 * 8:0x30 * 8 + 8]), "the digit 0 is the C64 ROM's")
     tap(c, V)
-    frames(c, 10)
+    frames(c, 40)
     check(scr(0, 5, 27) == "THE CONTROLS ARE AS FOLLOWS", "V shows the controls")
     tap(c, SPACE)
-    frames(c, 10)
+    frames(c, 40)
     check(scr(6, 7, 24) == "STRYKER'S WRIST TERMINAL", "SPACE shows the wrist terminal's")
     tap(c, SPACE)
-    frames(c, 10)
+    frames(c, 40)
     check(scr(0, 15, 10) == "PRESENTING", "SPACE goes back to the credits")
     tap(c, SPACE)
     run_until(c, lambda: c.m[0xdd00] & 3 == 1)                 # the game's own bank 2

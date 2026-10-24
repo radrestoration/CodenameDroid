@@ -154,13 +154,90 @@ intro_showpage:
     sta zp_u+1
     adc intro_m7_sh,x
     sta zp_ci+1
-    jsr intro_unpack
+    jsr intro_huff
     lda #<INTRO_PAGEBUF
     sta zp_p1
     lda #>INTRO_PAGEBUF
     sta zp_p1+1
     pla
     jmp intro_textpage
+
+; intro_huff: zp_p1 = a Huffman coded page (tools/make_intro.py: a canonical code, intro_hf_count and intro_hf_syms), zp_u = where
+; to, zp_ci = where that ends
+intro_huff:
+    lda #0
+    sta zp_v+1                  ; (no bits left in the byte)
+@sym:
+    lda #0
+    sta zp_d                    ; the code so far
+    sta zp_d+1
+    sta zp_idx                  ; the first code of this length
+    sta zp_idx+1
+    sta zp_h                    ; the index of the first symbol of this length
+    tax                         ; X = the length - 1
+@bit:
+    lda zp_v+1
+    bne @have
+    ldy #0
+    lda (zp_p1),y
+    sta zp_v
+    inc zp_p1
+    bne @b1
+    inc zp_p1+1
+@b1:
+    lda #8
+    sta zp_v+1
+@have:
+    asl zp_v
+    rol zp_d
+    rol zp_d+1
+    dec zp_v+1
+    lda intro_hf_count,x
+    sta zp_t                    ; the codes of this length
+    sec
+    lda zp_d
+    sbc zp_idx
+    tay                         ; code - first
+    lda zp_d+1
+    sbc zp_idx+1
+    bne @next
+    cpy zp_t
+    bcc @found
+@next:
+    lda zp_h                    ; on to the next length: the symbols and the codes so far, doubled
+    clc
+    adc zp_t
+    sta zp_h
+    lda zp_idx
+    clc
+    adc zp_t
+    sta zp_idx
+    bcc @n1
+    inc zp_idx+1
+@n1:
+    asl zp_idx
+    rol zp_idx+1
+    inx
+    bne @bit
+@found:
+    tya
+    clc
+    adc zp_h
+    tay
+    lda intro_hf_syms,y
+    ldy #0
+    sta (zp_u),y
+    inc zp_u
+    bne @u1
+    inc zp_u+1
+@u1:
+    lda zp_u+1
+    cmp zp_ci+1
+    bcc @sym
+    lda zp_u
+    cmp zp_ci
+    bcc @sym
+    rts
 
 ; intro_space: wait for SPACE (or fire): C = 0; or for RUN/STOP: C = 1
 intro_space:

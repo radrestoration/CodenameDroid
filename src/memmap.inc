@@ -111,9 +111,15 @@ kb_joy          = $024b
 kb_tmp          = $024c
 kb_prev         = $0280     ; 9: the keyboard rows and joystick as the last scan with a change saw them
 
+c64_tmap        = $022c     ; 1 = the title is shown through the title map (tools/make_title_map.py; cells.s)
+c64_tmap_ok     = $022d     ; 1 = the map is in memory (it needs the loading screens' data to unpack from)
+c64_hide_ok     = $022e     ; 1 = the title's scroll (40-cell build) hides the old frame sliding in, for the new layout to appear
 c64_pal         = $0205     ; 1 = PAL (50 Hz), 0 = NTSC (60 Hz)
 c64_frames      = $0206     ; counts the raster interrupts (frames)
 c64_lastf       = $0208     ; c64_frames when hw_wait_frame last returned
 c64_acc         = $0209     ; NTSC pacing: frames owed to the BBC's 50 Hz, in fifths, plus 32
 c64_defer       = $020a     ; 1 = a vertical-blank wait has returned and its display update is still to come
 c64_gamemode    = $0207     ; 1 = gameplay (the camera follows the player), 0 = any other screen
+
+; the title map (WIDE=40): its segments
+TMAP_SEG        = $fe00     ; up to 500 bytes: segments (length, ring offset low, high), ended by 0

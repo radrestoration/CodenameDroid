@@ -48,6 +48,8 @@ echo "== scrolling right shows the picture and its display start together (no st
 $P tools/test_scroll.py | tail -1
 echo "== the lookup tables made at start-up"
 $P tools/test_tables.py | tail -1
+echo "== the title screen's map (40 cells only)"
+$P tools/test_titlemap.py | tail -1
 echo "== the fast sprite plots against the BBC loops they replace"
 $P tools/test_fastplot.py | tail -1
 echo "== the loading screens: unpacker, flow, timing"

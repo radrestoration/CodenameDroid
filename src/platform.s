@@ -151,6 +151,25 @@ start:
     ldx #>(__SOUNDC_SIZE__ + 255)
     jsr copy_pages
     jsr make_runtime_tables
+.if INTRO_PRESENT
+.if INTRO_TMAP
+    lda #<intro_tmap_c          ; the title screen's map (the intro's unpacker and data are still in memory)
+    sta zp_p1
+    lda #>intro_tmap_c
+    sta zp_p1+1
+    lda #<TMAP_SEG
+    sta zp_u
+    lda #>TMAP_SEG
+    sta zp_u+1
+    lda #<(TMAP_SEG + INTRO_TMAP_SIZE)
+    sta zp_ci
+    lda #>(TMAP_SEG + INTRO_TMAP_SIZE)
+    sta zp_ci+1
+    jsr intro_unpack
+    lda #1
+    sta c64_tmap_ok
+.endif
+.endif
 
     jsr hw_init
     jsr snd_init
@@ -733,6 +752,13 @@ c64_wait_deferred:
 
 ; what `delay` leaves behind (the title scroll's per-step busy-wait is not wanted here)
 c64_scroll_delay:
+    lda c64_hide_ok             ; the title's scroll (40-cell build): when the letters have gone by and the old frame starts to slide
+    beq @shown                  ; in (the last 33 steps), the screen is blanked: the title that follows is arranged differently
+    lda scroll_count
+    cmp #34
+    bcs @shown
+    jsr c64_video_off
+@shown:
 .if RING_W <> 32
     lda scroll_count            ; The title scroll's last RING_W - 32 steps draw the columns beyond the 32 the title shows
     cmp #(RING_W - 32) + 1      ; (it crops the window): the first screen of the game starts with the leftmost of them,
@@ -949,15 +975,18 @@ detect_pal:
     bne @l
     rts
 
+; (reading $d011 gives the raster line's bit 8 in bit 7, and writing it back sets the raster interrupt's compare line's bit 8: done
+; while the beam was below line 255 it would move the interrupt to line $1fb, where it never comes: so bit 7 is cleared)
 c64_video_off:
     lda $d011
-    and #$ef
+    and #$6f
     sta $d011
     rts
 
 c64_video_on:
     lda $d011
     ora #$10
+    and #$7f
     sta $d011
     rts
 
@@ -1453,6 +1482,7 @@ c64_game_mode:                  ; at the top of main_game_loop; returns A = the 
     sta c64_gamemode
     lda #0
     sta c64_title
+    sta c64_tmap
     txa
     pha
     tya
@@ -1488,9 +1518,45 @@ c64_set_view:
 @same:
     rts
 
+.if RING_W <> 32
+; the title screen, once its scroll is over: shown through the title map (see cells.s) if it was made
+c64_title_static:
+    lda c64_tmap_ok
+    beq @show
+    lda c64_tmap
+    bne @show
+    lda #1
+    sta c64_tmap
+    ldx #40                     ; the whole width, from matrix column 0
+    ldy #0
+    jsr c64_set_view
+    lda #$ff
+    sta zp_vb+1                 ; (rebuild the matrix, even if the view's size is what it was)
+    jsr matrix_clear
+    lda #$13                    ; the screen is still blank: a frame to make the matrix, one more for the interrupt to swap to it
+    jsr c64_osbyte
+    lda #$13
+    jsr c64_osbyte
+@show:
+    lda #0
+    sta c64_hide_ok
+    jmp c64_video_on
+
+; the space bar on the title screen (patched in for its call of flush_buffers): back to the ordinary view for the scroll onto
+; the first level
+c64_leave_title:
+    lda c64_tmap
+    beq @f
+    lda #0
+    sta c64_tmap
+    jsr c64_view_crop
+@f: jmp flush_buffers
+.endif
+
 c64_title_mode:
     lda #0
     sta c64_gamemode
+    sta c64_tmap
     lda #1
     sta c64_title
     jsr c64_view_crop
@@ -1499,6 +1565,7 @@ c64_title_mode:
 c64_status_mode:
     lda #0
     sta c64_gamemode
+    sta c64_tmap
     sta c64_title
     jsr c64_view_crop
     jmp set_colour_zero_to_black
@@ -1507,5 +1574,6 @@ c64_gameover_mode:
     lda #0
     sta c64_gamemode
     sta c64_title
+    sta c64_tmap
     jsr c64_view_crop
     jmp game_over_screen
