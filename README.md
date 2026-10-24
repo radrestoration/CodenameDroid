@@ -13,8 +13,6 @@ Game has been tested in VICE and real NTSC C64 hardware.
   <img src="screenshots/play2.png" alt="Game play: soldiers and girders" width="30%">
 </p>
 
-![Game play: soldiers and girders](screenshots/play2.png)
-
 ## Copyright and Ownership
 
 Like many BBC Micro games, this software is considered abandonware, and the copyright status is unclear. 
