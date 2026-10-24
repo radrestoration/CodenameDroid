@@ -7,6 +7,12 @@ This is an AI port using Claude by Rad Restoration - contact@radrestoration.com.
 
 Game has been tested in VICE and real NTSC C64 hardware. 
 
+![The title screen](screenshots/intro.png)
+
+![Game play: the surface](screenshots/play1.png)
+
+![Game play: soldiers and girders](screenshots/play2.png)
+
 ## Copyright and Ownership
 
 Like many BBC Micro games, this software is considered abandonware, and the copyright status is unclear. 

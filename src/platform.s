@@ -1483,6 +1483,7 @@ c64_game_mode:                  ; at the top of main_game_loop; returns A = the 
     lda #0
     sta c64_title
     sta c64_tmap
+    jsr c64_video_on            ; (it was blanked by the space bar on the title screen)
     txa
     pha
     tya
@@ -1545,6 +1546,7 @@ c64_title_static:
 ; the space bar on the title screen (patched in for its call of flush_buffers): back to the ordinary view for the scroll onto
 ; the first level
 c64_leave_title:
+    jsr c64_video_off           ; the screen stays blank for the scroll onto the first level, until the game starts (c64_game_mode)
     lda c64_tmap
     beq @f
     lda #0
