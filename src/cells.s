@@ -114,7 +114,7 @@ cells_reset:
 .if RING_W <> 32
     jsr make_row_col_tables
 .endif
-    rts
+    jmp e3_forget               ; (the characters are all new: enemy.s's memo of them is wrong)
 
 .if RING_W <> 32
 ; ROWTAB[d] = d / RING_W and COLTAB[d] = d mod RING_W for d = 0 .. RING_CELLS-1
@@ -320,6 +320,41 @@ process_dirty:
     jsr update_cell
     jmp @next
 
+; cell_is: Z set if the pattern of character X is the 8 bytes at zp_p1 (the ring cell). Clobbers A, Y.
+cell_is:
+    ldy #0
+    lda (zp_p1),y
+    cmp BPAT0,x
+    bne @r
+    iny
+    lda (zp_p1),y
+    cmp BPAT1,x
+    bne @r
+    iny
+    lda (zp_p1),y
+    cmp BPAT2,x
+    bne @r
+    iny
+    lda (zp_p1),y
+    cmp BPAT3,x
+    bne @r
+    iny
+    lda (zp_p1),y
+    cmp BPAT4,x
+    bne @r
+    iny
+    lda (zp_p1),y
+    cmp BPAT5,x
+    bne @r
+    iny
+    lda (zp_p1),y
+    cmp BPAT6,x
+    bne @r
+    iny
+    lda (zp_p1),y
+    cmp BPAT7,x
+@r: rts
+
 ; update_cell: zp_ci = cell. Find or make the character for its current bytes.
 update_cell:
     ; zp_p1 = RING + cell*8
@@ -347,37 +382,7 @@ update_cell:
     ldy zp_ci
     lda (zp_u),y
     tax
-    ldy #0
-    lda (zp_p1),y
-    cmp BPAT0,x
-    bne @changed
-    iny
-    lda (zp_p1),y
-    cmp BPAT1,x
-    bne @changed
-    iny
-    lda (zp_p1),y
-    cmp BPAT2,x
-    bne @changed
-    iny
-    lda (zp_p1),y
-    cmp BPAT3,x
-    bne @changed
-    iny
-    lda (zp_p1),y
-    cmp BPAT4,x
-    bne @changed
-    iny
-    lda (zp_p1),y
-    cmp BPAT5,x
-    bne @changed
-    iny
-    lda (zp_p1),y
-    cmp BPAT6,x
-    bne @changed
-    iny
-    lda (zp_p1),y
-    cmp BPAT7,x
+    jsr cell_is
     bne @changed
     rts
 @changed:
@@ -398,39 +403,9 @@ update_cell:
     beq @miss
     sta zp_c
     tax
-    ldy #0
-    lda (zp_p1),y
-    cmp BPAT0,x
+    jsr cell_is
     bne @other
-    iny
-    lda (zp_p1),y
-    cmp BPAT1,x
-    bne @other
-    iny
-    lda (zp_p1),y
-    cmp BPAT2,x
-    bne @other
-    iny
-    lda (zp_p1),y
-    cmp BPAT3,x
-    bne @other
-    iny
-    lda (zp_p1),y
-    cmp BPAT4,x
-    bne @other
-    iny
-    lda (zp_p1),y
-    cmp BPAT5,x
-    bne @other
-    iny
-    lda (zp_p1),y
-    cmp BPAT6,x
-    bne @other
-    iny
-    lda (zp_p1),y
-    cmp BPAT7,x
-    bne @other
-    jmp @have
+    jmp uc_have
 @other:
     lda NXT,x
     jmp @chain
@@ -457,6 +432,10 @@ update_cell:
     adc #>CHARSET
     sta zp_u+1
     ldx zp_c
+    inc VER,x                   ; (enemy.s remembers characters by their version: this one is another pattern now)
+    bne @verok
+    jsr e3_forget
+@verok:
     ; line 0..7: BBC byte -> BPATk[c], converted byte -> charset
     ldy #0
     lda (zp_p1),y
@@ -527,7 +506,7 @@ update_cell:
     sta REFL,y
     sta REFH,y
 
-@have:
+uc_have:                        ; (also entered by enemy.s with zp_c a character whose pattern is the ring's)
     ; zp_c is the character for the cell now. What did the cell have?
     lda zp_ci+1
     clc
@@ -623,16 +602,14 @@ alloc_char:
 
 ; show_cell: if the cell zp_ci is in the matrix window, put zp_c there
 show_cell:
-    lda zp_remap
-    bne @out                    ; the matrix is about to be rebuilt anyway
 .if RING_W <> 32
     lda c64_tmap
     beq @notitle
-    lda #1                      ; (the title map: a cell's place is not worked out: the whole matrix is made again, which the
-    sta zp_remap                ; title screen, which hardly changes, can afford)
-    rts
+    jmp title_dirty
 @notitle:
 .endif
+    lda zp_remap
+    bne @out                    ; the matrix is about to be rebuilt anyway
     sec
     lda zp_ci
     sbc zp_vb
@@ -758,9 +735,7 @@ view_prepare:
     sta zp_nv+1
     WRAP_CELL zp_nv
 .endif
-    lda #0
-    sta zp_remap
-    lda zp_nv
+    lda zp_nv                   ; (zp_remap stays set if set_crtc_address set it: show_cell has skipped cells since)
     cmp zp_vb
     bne @changed
     lda zp_nv+1
@@ -1046,6 +1021,38 @@ camera_update:
 ; screen order: a length, and the offset (from the ring window's top left) of the first of the cells they are copied from. A
 ; change of any cell makes show_cell ask for the whole matrix to be made again.
 
+; title_dirty: the title map's show_cell: a cell's place is not worked out; its ring row is noted, and the matrix is made
+; again for the rows that changed (title_remap)
+title_dirty:
+    sec
+    lda zp_ci
+    sbc zp_vb
+    sta zp_d
+    lda zp_ci+1
+    sbc zp_vb+1
+    sta zp_d+1
+    bpl @nowrap
+    clc
+    lda zp_d
+    adc #<RING_CELLS
+    sta zp_d
+    lda zp_d+1
+    adc #>RING_CELLS
+    sta zp_d+1
+@nowrap:
+    clc
+    adc #>ROWTAB
+    sta zp_u+1
+    lda zp_d
+    sta zp_u
+    ldy #0
+    lda (zp_u),y
+    tax
+    lda #1
+    sta TDIRTY,x
+    sta zp_remap
+    rts
+
 ; title_remap: the back matrix from the segments
 title_remap:
     lda c64_back
@@ -1059,15 +1066,33 @@ title_remap:
 @seg:
     ldy #0
     lda (zp_p1),y
-    beq @done
+    bne @have
+    jmp @done
+@have:
     sta zp_rx                   ; its length
     iny
     lda (zp_p1),y
-    clc
-    adc zp_vb
-    sta zp_idx
+    sta zp_u
     iny
     lda (zp_p1),y
+    sta zp_u+1                  ; its ring cell, from the view's top left
+    clc
+    adc #>ROWTAB
+    sta @rt+2
+    ldx zp_u
+@rt:
+    lda ROWTAB,x                ; its ring row: made again if it changed since the other matrix was built (TDIRTY), or
+    tax                         ; before (TDIRTY2: the changes that the matrix being built here has not had)
+    lda TDIRTY,x
+    ora TDIRTY2,x
+    bne @make
+    jmp @adv
+@make:
+    clc
+    lda zp_u
+    adc zp_vb
+    sta zp_idx
+    lda zp_u+1
     adc zp_vb+1
     sta zp_idx+1
     WRAP_CELL zp_idx            ; the ring cell it starts at
@@ -1090,6 +1115,7 @@ title_remap:
     sta $ffff,y
     dey
     bpl @ld
+@adv:
     lda zp_d
     clc
     adc zp_rx
@@ -1101,9 +1127,19 @@ title_remap:
     clc
     adc #3
     sta zp_p1
-    bcc @seg
+    bcs @nxt
+    jmp @seg
+@nxt:
     inc zp_p1+1
     jmp @seg
 @done:
+    ldx #31                     ; (the next matrix to be built lacks the changes of this round)
+@rot:
+    lda TDIRTY,x
+    sta TDIRTY2,x
+    lda #0
+    sta TDIRTY,x
+    dex
+    bpl @rot
     rts
 .endif

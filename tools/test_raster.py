@@ -74,7 +74,7 @@ def run(pal):
     s0 = S(c)
     c.pressed = {(2, 7)}                      # X: walk right
     worst.clear()
-    shown[1] = 0
+    shown[0] = shown[1] = 0
     for _ in range(100):
         c.run_frames(1)
         shown[0] = 0

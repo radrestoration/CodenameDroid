@@ -114,6 +114,35 @@ kb_prev         = $0280     ; 9: the keyboard rows and joystick as the last scan
 c64_tmap        = $022c     ; 1 = the title is shown through the title map (tools/make_title_map.py; cells.s)
 c64_tmap_ok     = $022d     ; 1 = the map is in memory (it needs the loading screens' data to unpack from)
 c64_hide_ok     = $022e     ; 1 = the title's scroll (40-cell build) hides the old frame sliding in, for the new layout to appear
+MEMLO          = $fb00     ; enemy.s: a memo of 128 entries by the address of a sprite cell (bit 14 = flipped): which source (low, high),
+MEMHI          = $fb80     ;   and the character its cells came out as the last time with that character's version (VER, which
+MEMC           = $fc00     ;   changes whenever the character is given a new pattern, which makes the entry wrong)
+MEMV           = $fc80
+VER            = $fd00
+c64_loopf      = $0258     ; (CHEAT builds) c64_frames at the last pass of the game's loop
+e3_gp           = $0259     ; enemy.s: the first byte of the group of rows being plotted (2),
+e3_cnt          = $025b     ;   the groups left,
+e3_key          = $025c     ;   the source of the cell being done: its address, bit 14 set for a flipped plot (2),
+e3_idx          = $025e     ;   its memo entry,
+e3_k            = $025f     ;   the columns left,
+e3_nc           = $0260     ;   the columns,
+e3_fl           = $0261     ;   $40 for a flipped plot,
+e3_s0           = $0262     ;   the first column's sprite address (2) and
+e3_a            = $0264     ;   the column's (2),
+t_sa            = $0266     ;   and the column of tiles: where the tile began (2),
+t_key           = $0268     ;   what it comes from (2),
+t_k             = $026a     ;   cells left,
+e3_dummy        = $026b     ;   where the columns past the width of a plot of one or two columns are written (8)
+c64_enear       = $0257     ; 1 = the enemy being updated is near the window (enemy.s)
+PO_K            = $0250     ; c64_plot_window_objects: the objects left to consider
+PO_I            = $0251     ; the object (its index in the level's table, from level * 4)
+PO_L            = $0252     ; the level x of the window's left column
+PO_X            = $0253     ; the column being plotted, and the last to plot
+PO_XE           = $0254
+PO_W            = $0255     ; the object's width
+PO_H            = $0256     ; the object type * 4
+TDIRTY          = $ed80     ; 32: the title map: ring rows changed since the last matrix was built (title_remap)
+TDIRTY2         = $eda0     ; 32: and the round before
 c64_pal         = $0205     ; 1 = PAL (50 Hz), 0 = NTSC (60 Hz)
 c64_frames      = $0206     ; counts the raster interrupts (frames)
 c64_lastf       = $0208     ; c64_frames when hw_wait_frame last returned

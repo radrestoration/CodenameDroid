@@ -77,6 +77,10 @@ def main(frames, script_text, deepest=0, step=1, quiet=False):
         mb, mc = bbc.m, c64.m
         diff = [n for n in STATE if mb[SYM[n]] != mc[SYM[n]]] + ["objects_carried+%d" % k for k in range(16)
                                                                  if mb[0xc0 + k] != mc[0xc0 + k]]
+        en = [i for i in range(0x04, 0x36) if mb[i] != mc[i]]      # (the enemies' variables: x, y, direction and state, ...)
+        if en and not diff:
+            print("iteration %d: the enemies differ at zero page %s" % (i, [hex(k) for k in en[:8]]))
+            return 1
         if diff:
             # (a wider window changes how often some things happen, e.g. the jet pack's energy runs down at each step of
             # the redraw of the level; from here on the games are not the same game)

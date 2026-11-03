@@ -4,7 +4,7 @@ are there from start-up on), and the loading screens' data below $d000.   check_
 import re
 import sys
 
-LIVE = ("DROID", "D2_5800", "START", "CODE")           # (SOUNDC runs elsewhere)
+LIVE = ("DROID", "D2_5800", "START", "CODE")           # (SOUNDC and HIGHC run elsewhere)
 
 
 def main(path):
@@ -17,10 +17,10 @@ def main(path):
     for n in LIVE:
         if n in seg and seg[n][2] and seg[n][1] >= 0xa000:
             bad.append("%s ends at $%04x (must be below $a000)" % (n, seg[n][1]))
-    for n in ("RODATA", "INTRO", "INTRO2", "SOUNDC"):
+    for n in ("RODATA", "INTRO", "INTRO2", "SOUNDC", "HIGHC"):
         if n in seg and seg[n][2]:
             lo, hi = seg[n][0], seg[n][1]
-            load_hi = hi if n not in ("SOUNDC",) else None
+            load_hi = hi if n not in ("SOUNDC", "HIGHC") else None
             if load_hi is not None and load_hi >= 0xd000:
                 bad.append("%s ends at $%04x (must be below $d000)" % (n, hi))
     room = 0x9fff - seg["CODE"][1]

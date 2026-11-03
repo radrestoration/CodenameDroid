@@ -18,11 +18,16 @@ override LD65 := $(call tilde,$(LD65))
 WIDE ?= 40
 export WIDE
 B   ?= build/c64
+# make CHEAT=1: a test build (its own directory) in which the player cannot die
+ifdef CHEAT
+B      := build/cheat
+AFLAGS += -DCHEAT
+endif
 BBC := build/bbc
 GEN := $(B)/gen
 SRC := $(wildcard src/*.s src/*.inc)
 
-.PHONY: all gen levels test help clean FORCE zip
+.PHONY: all gen levels test help clean FORCE zip proto
 all: $(B)/droid.prg
 
 help:
@@ -31,6 +36,7 @@ help:
 	@echo "make test         the checks in the headless 6502 simulator (make test WIDE=32 for the 32-cell build's)"
 	@echo "make levels       render the 12 levels to build/c64/levels/*.png"
 	@echo "make zip         build/c64/codename-droid-c64.zip: the PRG, the disk image, a VICE run script and README.md"
+	@echo "make native       the native engine (native/README.md): build/native/game.prg and game.d64; CHEAT=1, PROFILE=1; native/run.sh"
 	@echo "make clean        remove build/c64 (build/bbc is the BBC game's: make -C bbc clean)"
 
 # the BBC game rebuilt first (its disc.lbl and CDroid4 are what the tools read)
@@ -85,3 +91,42 @@ zip: $(B)/droid.prg tools/make_zip.py tools/dist_run.sh README.md
 
 clean:
 	rm -rf $(B)
+
+# the C64-native engine prototype (proto/): `make proto` builds build/proto/proto.prg, `proto/run.sh` runs it in VICE
+PROTO ?= build/proto
+PROTO_LEVEL ?= 1
+proto: $(PROTO)/proto.prg
+
+$(PROTO)/rows.bin: proto/make_proto_data.py tools/bbcmem.py $(BBC)/CDroid4
+	$(PYTHON) -I proto/make_proto_data.py $(PROTO) $(PROTO_LEVEL)
+
+$(PROTO)/proto.o: proto/proto.s $(PROTO)/rows.bin
+	$(CA65) -g -I $(PROTO) --bin-include-dir $(PROTO) proto/proto.s -o $@ -l $(PROTO)/proto.lst
+
+$(PROTO)/proto.prg: $(PROTO)/proto.o proto/proto.cfg
+	$(LD65) -C proto/proto.cfg $< -o $@ -Ln $(PROTO)/proto.lbl -m $(PROTO)/proto.map
+
+# the C64-native game (native/): `make native` builds build/native/game.prg
+PROFILE ?=
+CHEAT ?=
+NATIVE ?= build/native$(if $(PROFILE),-profile)$(if $(CHEAT),-cheat)
+
+.PHONY: native
+native: $(NATIVE)/game.prg
+
+$(NATIVE)/native_data.inc: tools/make_native_data.py tools/bbcmem.py tools/make_tables.py $(BBC)/CDroid4
+	$(PYTHON) -I tools/make_native_data.py $(NATIVE)
+
+$(NATIVE)/game.o: native/game.s native/*.s native/state.inc src/sound.s $(NATIVE)/native_data.inc
+	$(CA65) -g $(if $(PROFILE),-DPROFILE) $(if $(CHEAT),-DCHEAT) -I $(NATIVE) -I native -I src native/game.s -o $@ -l $(NATIVE)/game.lst
+
+$(NATIVE)/game.prg: $(NATIVE)/game.o native/game.cfg
+	$(LD65) -C native/game.cfg $< -o $@ -Ln $(NATIVE)/game.lbl -m $(NATIVE)/game.map
+	$(C1541) -format "droid,01" d64 $(NATIVE)/game.d64 -write $@ game >/dev/null
+	@if [ -n "$(wildcard $(DISC))" ]; then $(MAKE) -s $(NATIVE)/intro.prg && \
+	  $(C1541) -format "droid,01" d64 $(NATIVE)/droid.d64 -write $(NATIVE)/intro.prg droid -write $@ game >/dev/null; fi
+
+# the loading screens, a program of their own that loads the game (intro/): build/native/intro.prg, and droid.d64 with both
+$(NATIVE)/intro.prg: intro/intro_main.s intro/intro.cfg src/intro.s $(GEN)/intro_data.s
+	$(CA65) -g -I src -I intro -I $(GEN) intro/intro_main.s -o $(NATIVE)/intro.o -l $(NATIVE)/intro.lst
+	$(LD65) -C intro/intro.cfg $(NATIVE)/intro.o -o $@ -m $(NATIVE)/intro.map

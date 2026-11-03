@@ -468,8 +468,14 @@ def main(out):
         f.write("INTRO_PG_CREDITS = %d\nINTRO_PG_KEYS = %d\nINTRO_PG_TERMINAL = %d\n" % (n7, n7 + 1, n7 + 2))
         f.write("INTRO_COLOURS2 = $%02x          ; picture 2: red, cyan\n" % (C64_RED << 4 | C64_CYAN))
         f.write("INTRO_M7_PAGES = %d\n" % n7)
-        f.write('\n.segment "INTRO"\n\nintro_img1:\n' + bytes_lines(img1) + "intro_img2:\n" + bytes_lines(img2))
+        gap = (0x8000 - 0x6600) if (scroll and os.environ.get("WIDE") != "32") else 0      # (the 40-column layout's gap below the tiles)
+        room = gap - len(img1s) - len(img2x or b"\0") - len(img1)
+        in_gap = room >= 0                                # the logo's picture too, if the gap has room for it
+        if not in_gap:
+            room += len(img1)
+        f.write('\n.segment "INTRO"\n\n' + ("" if in_gap else "intro_img1:\n" + bytes_lines(img1)) + "intro_img2:\n" + bytes_lines(img2))
         f.write('\n.segment "INTRO2"                ; (in the gap: data used before the scroll, which uses the gap as a bitmap, is unpacked)\n\n'
+                + ("intro_img1:\n" + bytes_lines(img1) if in_gap else "")
                 + "intro_img1s:                    ; the logo's screen RAM\n" + bytes_lines(img1s)
                 + "intro_img2x:                    ; (the scroll's other rows)\n" + bytes_lines(img2x or b"\0") + '\n.segment "INTRO"\n\n')
         f.write("INTRO_SCROLL = %d\n" % (1 if scroll else 0))
@@ -485,11 +491,16 @@ def main(out):
             f.write("INTRO_TMAP_SIZE = %d\nintro_tmap_c:\n" % len(tseg) + bytes_lines(compress(tseg)))
         f.write('\n.segment "INTRO"\n\nintro_hf_count:                  ; the Huffman code of the pages: how many codes there are of each length 1-15,\n'
                 + bytes_lines(bytes(hf_count)) + "intro_hf_syms:                   ; and the symbols in code order\n" + bytes_lines(bytes(hf_syms)))
+        seg = None
         for n, (blob, size) in enumerate(pages):
-            if n == 0:
-                f.write('\n.segment "INTRO2"                ; (the 40-column layout puts the instruction pages in a gap)\n\n')
-            if n == n7:
-                f.write('\n.segment "INTRO"\n\n')
+            want = "INTRO"
+            if n < n7 and gap and room >= len(blob):      # the instruction pages go into the gap while there is room (the rest after)
+                want, room = "INTRO2", room - len(blob)
+            elif n < n7:
+                room = -1
+            if want != seg:
+                f.write('\n.segment "%s"\n\n' % want)
+                seg = want
             f.write("intro_m7_%d:\n" % n + bytes_lines(blob))
         f.write("intro_m7_lo:\n    .byte " + ",".join(["<intro_m7_%d" % n for n in range(len(pages))] or ["0"]) + "\n")
         f.write("intro_m7_hi:\n    .byte " + ",".join([">intro_m7_%d" % n for n in range(len(pages))] or ["0"]) + "\n")

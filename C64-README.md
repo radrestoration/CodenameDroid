@@ -1,5 +1,8 @@
 # Codename Droid - C64 port
 
+**Note:** a native rewrite of the engine (character mode, hardware sprites, the BBC's rules ported routine by routine) is in `native/`
+(see `native/README.md`); this document describes the port that runs the BBC's own code.
+
 The BBC game (rebuilt bit-for-bit in `bbc/`, see `bbc/README.md`) running on a C64, in a window 40 cells wide instead of
 the BBC's 32 (the BBC's own 32 is a build option, `WIDE=32`). **It has not been run on a C64 or in
 VICE** - everything below was checked in a headless 6502 simulator only (see "Verification").
@@ -223,3 +226,41 @@ second bitmap there); anything needed afterwards (the credits' character set, th
 | `tools/test_fastplot.py`, `test_tables.py`, `test_intro.py`, `shots_intro.py` | the fast player plots against the BBC loops; the loading screens in the raster simulator; their pictures |
 | `tools/bbcsim.py`, `c64sim.py`, `sim6502.py` | the simulators; `test_*.py`, `run_tests.sh`, `measure_*.py`, `profile*.py` the checks |
 | `tools/bbcmem.py`, `extract_levels.py` | decoders for the BBC levels and tiles (level previews) |
+
+## Enemy update, objects and the test build (2026-10-25/26)
+
+- `src/enemy.s` (the HIGHC segment, copied to $f600 at start-up: the engine's code below $a000 has no room left) holds:
+  - `c64_buffer_if_near` / `c64_check_if_near`: an enemy more than 12 columns outside the window is not plotted, so the
+    pixels the game buffers at the player's collision points and at the colliding blasters, to compare them after the plot, cannot
+    change: the buffering and the test are skipped for it (the mines are still tested, by position).
+  - unrolled copies of an enemy's four variables.
+  - `e3_run` (`c64_fenemy_go` / `c64_sprite_go`): one to three columns of an enemy's sprite, whole cells (flipped or not), done a
+    group of 8 rows at a time. The instruction in front of the BBC's column loop is a jump to them; anything they do not handle
+    goes on into the loop. They also give each cell its character without the dirty list, the hash or the comparing: the character
+    is remembered by where the cell's bytes come from (the sprite address, with the flip) in a memo of 128 entries (`e3_cell`),
+    valid while the character has not been given another pattern since (`VER`, bumped in update_cell's allocation).
+    Remembered: the enemies' sprites (page $0a-$0b, rewritten in place by swap_enemy_colours, which forgets them: `c64_swap_hook`)
+    and every tile's graphics (not page 0 or $0a-$0b). A cell it cannot answer goes through update_cell.
+  - `c64_tile_begin` / `c64_tile_end`: the same for a column of tiles (the new edge of a scrolling window; the key is the address
+    the tile is really read from, with the flipping in the bottom bits and bit 13 set to keep tiles apart from sprites).
+  - `c64_plot_window_objects`: after the lifts' scrolls (tiles only) every object in the window is plotted, as the edges would
+    have plotted it. The 40-column window can have an object across its edge, which the BBC's 32 never does; the edge plot gave
+    a chest in level 3 only its last column.
+- `set_crtc_address` sets zp_remap (the matrix will be made again: show_cell has nothing to do until then); view_prepare no
+  longer clears it.
+- Tests: `test_fastenemy.py` (the plots against the BBC's loops), `test_enemycells.py` (the cell store after random plots, with
+  the sprites rewritten in between), `test_cellstore.py` (the cell store while the game is played, surface and Ancient Shrine).
+- Frames a pass of the game's loop takes (PAL; the BBC's is 4): scrolling 4.8 with no enemy, 5.0 with one, 6.0 with two, 6.8 with
+  three; standing, one enemy 4.0, three 5.0, five 7.0, nine about 9.5. What is left (a scroll step: about 15,000 cycles
+  to make the matrix again, 10,000 for the player's cells, which are only partly covered by the sprite and so cannot be
+  remembered; an enemy: about 15,000, of which its cells 5,000, its plot 3,000, its movement and collision tests 6,000).
+- `make CHEAT=1` (or `./run.sh cheat`): build/cheat, with the suit, the blaster and the lives topped up every pass of the loop,
+  and the border showing how long the pass took in frames (black up to 5, yellow 6-7, red 8 or more; the BBC's pace on an NTSC
+  machine is 4.8).
+- The wrist terminal is laid out in 20 rows (7-26) instead of 23: the rows are in `make_game_source.py` (and in
+  `wrist_terminal_text` in data.s, patched there).
+- `long_delay` waits 27 frames (the BBC's busy wait is 0.54 s): the display is only updated at frame waits, so the "no map
+  yet" message was never seen.
+- The title's matrix is rebuilt only for the ring rows that changed (TDIRTY/TDIRTY2), not whole each time.
+- Memory: the logo picture and as many instruction pages as fit now live in the gap at $6600 (data used only before the scroll),
+  which frees the PRG's tail; the PRG now ends at $cfff.

@@ -10,7 +10,9 @@
 ; 100 Hz clock from an accumulator.
 ; Not done: the BBC's sync and hold flags (the game does not use them), periodic noise (the SID has none).
 
+.ifndef SND
 SND         = $ed00             ; variables (RAM nothing else uses; the cell tables end below)
+.endif
 q_amp       = SND               ; 16: queue entries, channel * 4 + slot. Amplitude: bit 7 = envelope (low 2 bits - 1),
 q_pit       = SND + 16          ;     else the volume 0-15
 q_dur       = SND + 32          ; 16: duration (1/20 s), never 0

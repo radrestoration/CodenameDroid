@@ -93,8 +93,10 @@ def both(script_text, until=None, deepest=0, pokes=(), rdch=(), frames=2000):
 def main():
     bad = 0
     # the wrist terminal: A in play
+    # (the 40-column build's terminal is laid out in fewer rows than the BBC's: not compared; see make_game_source.py)
     bbc, c64 = both("SPACE@140-200,A@330-400")
-    bad += compare("terminal", bbc, c64)
+    if os.environ.get("WIDE") == "32":
+        bad += compare("terminal", bbc, c64)
     # the map: the terminal, then M (with the microfilm)
     bbc, c64 = both("J@140-146,A@330-400", until="map_screen_loop", deepest=1, pokes=[(280, 0xcc, 1)], rdch=[0x4d])
     bad += compare("map", bbc, c64)

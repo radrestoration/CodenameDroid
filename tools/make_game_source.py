@@ -70,7 +70,9 @@ def game(text):
     sta c64_crtc_high
     lda crtc_address_low
     sta c64_crtc_low
-    .res 10, $ea                     ; the BBC's 20 bytes, so that no address after this moves
+    lda #$01                         ; the matrix will be made again: until then show_cell has nothing to do
+    sta zp_remap
+    .res 6, $ea                      ; the BBC's 20 bytes, so that no address after this moves
     rts""", "set_crtc_address")
     # video off / on around display_level (CRTC R8)
     t = sub_once(t, """display_level:
@@ -88,6 +90,98 @@ def game(text):
     sta $fe01                        ; video register value
     rts""", """    jmp c64_video_on                 ; (BBC: CRTC R8 = 0, enable video output)
     .res 8, $ea""", "display_level video on")
+    # long_delay is a busy loop of 0.54 s on the BBC (the message of the wrist terminal's map, a lost life): the display is only
+    # updated at the frame waits, so it waits for 27 frames instead
+    t = sub_once(t, """long_delay:
+    ldx #$fa
+long_delay_loop:
+    lda #$ff
+    sta delay_length
+    jsr delay
+""", """long_delay:
+    ldx #$1b
+long_delay_loop:
+    lda #$ff
+    sta delay_length
+    jsr wait_for_vsync               ; (BBC: jsr delay, which is 0.54 s in all)
+""", "long_delay")
+    # a level entered by a lift is drawn by the scroll up or down, which plots tiles only: the game plots an object a column at a
+    # time as the window's edges pass it, and the BBC's 32-column window starts clear of the objects. The 40-column window
+    # can have an object across its edge (a chest drawn from its second column) or inside it (not drawn at all).
+    t = sub_once(t, "    sta level_sprite_base\n    jmp scroll_up\n",
+                 "    sta level_sprite_base\n    jmp c64_scroll_up_objs           ; (BBC: jmp scroll_up) plots the objects in the window too\n", "scroll_up objects")
+    t = sub_once(t, "    jsr scroll_down\n    jmp to_consider_saving_position",
+                 "    jsr c64_scroll_down_objs         ; (BBC: jsr scroll_down) plots the objects in the window too\n    jmp to_consider_saving_position", "scroll_down objects")
+    # enemies well outside the window need neither the buffering of the pixels they might collide with nor the test (enemy.s)
+    t = sub_once(t, "    jsr buffer_player_points_and_blasters\n    lda enemy_tile_fraction_and_frame\n",
+                 "    jsr c64_buffer_if_near           ; (BBC: jsr buffer_player_points_and_blasters)\n    lda enemy_tile_fraction_and_frame\n", "enemy buffer")
+    t = sub_once(t, "    jsr check_for_enemy_collision_with_blasters_and_player\n    jsr check_for_enemy_collision_with_mines\n",
+                 "    jsr c64_check_if_near            ; (BBC: jsr check_for_enemy_collision_with_blasters_and_player)\n    jsr check_for_enemy_collision_with_mines\n", "enemy check")
+    # an enemy's four variables, copied in and out of the working copy: unrolled (enemy.s)
+    t = sub_once(t, """    ldx enemy_to_update
+    ldy #$00
+get_enemy_variables_loop:
+    lda enemies_variables,x
+    sta a:enemy_variables,y
+    inx
+    iny
+    cpy #$04
+    bne get_enemy_variables_loop
+""", """    jmp c64_get_enemy_vars           ; (BBC: a loop of four)
+    .res 12, $ea
+c64_get_enemy_done:
+""", "get enemy variables")
+    t = sub_once(t, """set_enemy_variables:
+    ldx enemy_to_update
+    ldy #$00
+set_enemy_variables_loop:
+    lda a:enemy_variables,y
+    sta enemies_variables,x
+    inx
+    iny
+    cpy #$04
+    bne set_enemy_variables_loop
+""", """set_enemy_variables:
+    jmp c64_set_enemy_vars           ; (BBC: a loop of four)
+    .res 12, $ea
+c64_set_enemy_done:
+""", "set enemy variables")
+    # the enemies' sprites, three columns at a time (enemy.s): the last instruction before the BBC's column loops becomes a jump
+    # to code that does the plot where it can (width 3, whole cells) and otherwise goes on into the loop
+    t = sub_once(t, "    sta $3a79                        ; enemy_sprite_address_high\nplot_flipped_enemy_column_loop:\n",
+                 "c64_fenemy_hook:\n    jmp c64_fenemy_go                ; (BBC: sta $3a79)\nplot_flipped_enemy_column_loop:\n", "fast flipped enemy")
+    t = sub_once(t, "    lda $73                          ; sprite_address_high\n    sta plot_sprite_address_high\nplot_sprite_column_loop:\n",
+                 "    lda $73                          ; sprite_address_high\nc64_sprite_hook:\n    jmp c64_sprite_go                ; (BBC: sta plot_sprite_address_high)\nplot_sprite_column_loop:\n", "fast sprite")
+    if WIDE != 32:
+        # the wrist terminal, squeezed into 20 rows (7-26) of the 25 the view shows, instead of the BBC's 23 (5-27): the rows of
+        # its text (data.s has the same in wrist_terminal_text), and the pixel rows of its pictures and bars, moved with them
+        for old, new, what in (
+                ("    ldx #$17\n    ldy #$3e\n    jsr calculate_screen_address\n    lda #$80", "    ldx #$17\n    ldy #$46\n    jsr calculate_screen_address\n    lda #$80", "terminal face"),
+                ("    ldx #$11\n    ldy #$09\n    jsr tab_to_x_y\n    jsr plot_sector_number", "    ldx #$11\n    ldy #$0a\n    jsr tab_to_x_y\n    jsr plot_sector_number", "terminal sector"),
+                ("    ldx #$07\n    ldy #$c6\n    jsr calculate_screen_address\n    lda #$a8", "    ldx #$07\n    ldy #$be\n    jsr calculate_screen_address\n    lda #$a8", "terminal pass card"),
+                ("    ldx #$13\n    ldy #$c6\n    jsr calculate_screen_address\n    lda #$40", "    ldx #$13\n    ldy #$be\n    jsr calculate_screen_address\n    lda #$40", "terminal energy cell"),
+                ("    ldx #$07\n    ldy #$08\n    jsr tab_to_x_y\n    jsr plot_level_name", "    ldx #$07\n    ldy #$09\n    jsr tab_to_x_y\n    jsr plot_level_name", "terminal level name"),
+                ("plot_status:\n    ldx #$0b\n    ldy #$19\n", "plot_status:\n    ldx #$0b\n    ldy #$18\n", "terminal pass cards"),
+                ("    ldx #$17\n    ldy #$19\n    jsr tab_to_x_y\n", "    ldx #$17\n    ldy #$18\n    jsr tab_to_x_y\n", "terminal energy cells"),
+                ("    ldx #$06\n    ldy #$a6\nplot_energy_bar:", "    ldx #$06\n    ldy #$9f\nplot_energy_bar:", "terminal blaster bar")):
+            t = sub_once(t, old, new, old.split("\n")[1] + " " + what)
+    # a column of tiles (the new edge of the scrolling window): each cell of a tile is the same bytes whenever the tile, its
+    # fraction and its flipping are, so the character is remembered by where those came from (enemy.s), instead of every cell
+    # going through the dirty list and a hash
+    t = sub_once(t, "skip_mirroring_1936:\n    ldx #$00\n    lda $59                          ; flip\n",
+                 "skip_mirroring_1936:\n    jsr c64_tile_begin               ; (BBC: ldx #0 / lda $59)\n    .byte $ea\n", "tile begin")
+    t = sub_once(t, "consider_next_tile_in_column:\n    inc $76                          ; tile_y\n    lda $76                          ; tile_y\n",
+                 "consider_next_tile_in_column:\n    jsr c64_tile_end                 ; (BBC: inc tile_y / lda tile_y)\n    .byte $ea\n", "tile end")
+    # the enemy sprites are rewritten in place (red and white swapped) when a level starts: what enemy.s remembers of them is wrong
+    t = sub_once(t, "swap_enemy_colours:                  ; # Swaps red and white in enemy sprites\n    lda #$0a                         ; &0a00 = enemy_sprite_zero\n    sta $71                          ; sprite_address_high\n",
+                 "swap_enemy_colours:                  ; # Swaps red and white in enemy sprites\n    jsr c64_swap_hook                ; (BBC: lda #&0a / sta $71)\n    .byte $ea\n", "swap enemy colours")
+    # the map screen waits for a key in a loop with no frame wait: on the BBC the screen is the memory, here the display is made at
+    # the frame waits, so the loop waits for each frame (c64_map_wait is in what the BBC's calculate_player_screen_address_offset
+    # leaves: the 26 bytes after its jump)
+    t = sub_once(t, "map_screen_loop:\n    lda level\n    cmp #$07                         ; Crew's Quarters sector two only has right half\n",
+                 "map_screen_loop:\n    jsr c64_map_wait                 ; (BBC: lda level / cmp #7) a frame wait first\n    .byte $ea\n    ; Crew's Quarters sector two only has right half\n", "map wait")
+    t = sub_once(t, "    jmp wide_player_offset\n    .res 26, $ea                    ; (the BBC's code was longer)\n",
+                 "    jmp wide_player_offset\nc64_map_wait:\n    jsr wait_for_vsync\n    lda level\n    cmp #$07\n    rts\n    .res 18, $ea                    ; (the BBC's code was longer)\n", "map wait code")
     assert t.count("lda $fe64") == 2
     t = t.replace("lda $fe64                        ; User VIA timer 1 counter LSB",
                   "lda $dc04                        ; (BBC: User VIA timer 1 counter LSB) CIA 1 timer A")
@@ -197,6 +291,10 @@ def data(text):
     addresses in tile_sprites_addresses_table follow (the high byte of each, kept as 'TILES + (old - $5800)')."""
     if WIDE == 32:
         return text
+    for old, new in (("$1f,$08,$05 ", "$1f,$08,$07 "), ("$1f,$0a,$09 ", "$1f,$0a,$0a "), ("$1f,$08,$13 ", "$1f,$08,$12 "),
+                     ("$1f,$05,$17 ", "$1f,$05,$16 "), ("$1f,$10,$17 ", "$1f,$10,$16 "), ("$1f,$08,$1b ", "$1f,$08,$1a ")):
+        assert text.count("wrist_terminal_text") == 1 and text.count(old) == 1, old      # (the rows of the terminal's text)
+        text = text.replace(old, new)
     lines = text.split("\n")
     counts = {}
     for table, expect in (("tile_sprites_addresses_table", 19), ("player_sprite_addresses_table", 6)):

@@ -17,6 +17,7 @@
 .segment "START"
 
 .import __SOUNDC_LOAD__, __SOUNDC_RUN__, __SOUNDC_SIZE__
+.import __HIGHC_LOAD__, __HIGHC_RUN__, __HIGHC_SIZE__
 .import __D2_0400_LOAD__, __D2_03A0_LOAD__, __D2_0180_LOAD__, __D2_0380_LOAD__, __D2_0300_LOAD__
 
 start:
@@ -149,6 +150,16 @@ start:
     lda #>__SOUNDC_RUN__
     sta zp_u+1
     ldx #>(__SOUNDC_SIZE__ + 255)
+    jsr copy_pages
+    lda #<__HIGHC_LOAD__        ; and the enemy code
+    sta zp_p1
+    lda #>__HIGHC_LOAD__
+    sta zp_p1+1
+    lda #<__HIGHC_RUN__
+    sta zp_u
+    lda #>__HIGHC_RUN__
+    sta zp_u+1
+    ldx #>(__HIGHC_SIZE__ + 255)
     jsr copy_pages
     jsr make_runtime_tables
 .if INTRO_PRESENT
@@ -1367,8 +1378,10 @@ hook_finish_cells:
     lda hk_lines
     sta zp_ry
     lda hk_cols
+    beq @out                    ; (none: enemy.s has given the cells their characters)
     sta zp_rx
     jsr mark_rect
+@out:
     pla
     tay
     pla
@@ -1484,6 +1497,27 @@ c64_game_mode:                  ; at the top of main_game_loop; returns A = the 
     sta c64_title
     sta c64_tmap
     jsr c64_video_on            ; (it was blanked by the space bar on the title screen)
+.ifdef CHEAT                    ; make CHEAT=1: the suit, the blaster and the lives never run out (for testing), and the
+    lda #$25                    ; border shows how long the last pass of the game's loop took: black up to 5 frames (the
+    sta suit_energy             ; BBC's pace on an NTSC machine is 4.8), yellow 6-7, red 8 and more
+    sta blaster_energy
+    lda #$03
+    sta lives
+    lda c64_frames
+    tax
+    sec
+    sbc c64_loopf
+    stx c64_loopf
+    ldx #0
+    cmp #6
+    bcc @lp
+    ldx #7
+    cmp #8
+    bcc @lp
+    ldx #2
+@lp:
+    stx $d020
+.endif
     txa
     pha
     tya
@@ -1534,6 +1568,13 @@ c64_title_static:
     lda #$ff
     sta zp_vb+1                 ; (rebuild the matrix, even if the view's size is what it was)
     jsr matrix_clear
+    ldx #31                     ; every row to be made, for both matrices
+@td:
+    lda #1
+    sta TDIRTY,x
+    sta TDIRTY2,x
+    dex
+    bpl @td
     lda #$13                    ; the screen is still blank: a frame to make the matrix, one more for the interrupt to swap to it
     jsr c64_osbyte
     lda #$13

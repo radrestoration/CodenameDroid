@@ -11,6 +11,7 @@
 .include "ring_ops.s"
 .include "cells.s"
 .include "sound.s"
+.include "enemy.s"
 .include "intro.s"
 .include "platform.s"
 
