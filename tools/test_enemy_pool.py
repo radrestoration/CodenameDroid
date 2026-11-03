@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """Check new-game spawn side and enemy character groups on crowded levels.
-Run after `make native`: test_native_enemy_pool.py.
+Run after `make`: test_enemy_pool.py.
 """
 import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "native"))
+sys.path.insert(0, os.path.join(HERE, "..", "tools"))
 from sim_check import Machine, labels  # noqa: E402
 
 
 def main():
     mc = Machine()
     c, m = mc.cpu, mc.cpu.m
-    sym = labels(os.path.join(HERE, "..", "build", "native", "game.lbl"))
+    sym = labels(os.path.join(HERE, "..", "build", "c64", "game.lbl"))
     sentinel = 0x0200
     m[sentinel : sentinel + 3] = bytes((0x4C, sentinel & 255, sentinel >> 8))
     m[0xD01A] = 0

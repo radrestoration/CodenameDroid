@@ -1,11 +1,12 @@
 # Codename Droid: Stryker's Run Part 2
 
 **Codename Droid** (Superior Software, 1987, by Martin Edmondson and Nick Chamberlain) for the BBC Micro, rebuilt from its
-disassembly, and a **Commodore 64 port** that runs the game's own code with a C64 display layer.
+disassembly, and a **Commodore 64 port**: a C64-native engine that follows the BBC game's rules on a character-mode display
+with smooth scrolling.
 
 This is an AI port using Claude by Rad Restoration - contact@radrestoration.com.
 
-Game has been tested in VICE and real NTSC C64 hardware. 
+Tested in VICE (the rewrite has not been through a complete play-through yet).
 
 <p align="center">
   <img src="screenshots/intro.png" alt="The title screen" width="30%">
@@ -27,31 +28,32 @@ https://bbcmicro.co.uk/game.php?id=564
 
 ## Download
 
-[Download the C64 version (zip)](downloads)
+`make zip` builds the release zip (see Building).
 
 ## Commodore 64 Port Notes
 
 The game aims to be a faithful port of the original, but there are some consessions:
 
- - The original BBC Micro game ran in Mode 5, which is 256 pixels vertically with a reduced width of 256 (actually, 128, 
-   because the pixels are rectangular). The Commodore 64 version instead uses a play area of 320 (160 pixels) x 200 to give 
-   a rectangular play area of about the same area. The game play logic was redone to accomodate this. Also the game
-   implements a "camera follow" to allow for the larger vertical play area. 
+ - The original BBC Micro game ran in Mode 5, which is 256 pixels vertically with a reduced width of 256 (actually, 128,
+   because the pixels are rectangular). The Commodore 64 version instead uses a play area of 320 (160 pixels) x 200 to give
+   a rectangular play area of about the same area: 40 columns of cells instead of the BBC's 32, and a "camera follow" that
+   shows 25 of the level's 32 rows. The rules are the BBC's, ported routine by routine, and checked against the BBC game.
  - Joystick - the game is not playable with the joystick alone, it is really a keyboard driven game as most BBC Micro 
    games were. This would require some major thinking and work to accomodate a fully joystick driven game. 
  - Music and sound - the conversion is pretty good, but the BBC Micro's sound chip and the C64 SID are fundamentally different
    instruments. 
  - Loading screens - poorly done because of the attempt to squeeze in graphics from one set of hardware restrictions to another. 
 
-Otherwise, the game play and game play graphics, allowing for differences in palette should be identical to the original. 
-Bullets use C64 hardware sprites, but everything else is rendered in character mode. 
+Otherwise, the game play and game play graphics, allowing for differences in palette, follow the original.
+The player and the bullets are C64 hardware sprites; everything else is rendered in character mode.
 
 
 ## Running the C64 version
 
-With VICE (`x64sc`): `./run.sh` (PAL), `./run.sh ntsc`, `./run.sh d64` (from the disk image), `./run.sh warp`. In the
-release zip that is the `run.sh` beside `droid.prg` and `droid.d64`; in the source tree `./run.sh` builds first. Or load
-`droid.prg` or `droid.d64` yourself (`LOAD"DROID",8,1`, `RUN`). The program detects PAL and NTSC itself.
+With VICE (`x64sc`): `./run.sh` (PAL), `./run.sh ntsc`, `./run.sh d64` (from the disk image), `./run.sh warp`. `./run.sh cheat` is the test build. In the
+release zip that is the `run.sh` beside `game.prg` and `droid.d64`; in the source tree `./run.sh` builds first. Or load
+`droid.d64` yourself (`LOAD"DROID",8,1`, `RUN`; it loads the game after the loading screens), or `game.prg` (it starts at the
+title). The program detects PAL and NTSC itself.
 
 It starts as the BBC disc does:
 1. the instruction pages from the tape inlay (SPACE for each; RUN/STOP skips them),
@@ -87,14 +89,71 @@ You need cc65 (`ca65`, `ld65`), Python 3 with numpy and Pillow, and `c1541` (par
 (`Disc032-CodenameDroidStrykersRun2.ssd`, set `DISC` if it is not in `~/retro/games`); without it the build has no loading
 screens. The build itself needs nothing from a BBC ROM.
 
-    make            the C64 version: build/c64/droid.prg and droid.d64 (builds the BBC game into build/bbc first)
-    make WIDE=32    the same with the BBC's 32-cell window instead of the default 40 (same directory)
+    make            build/c64/game.prg, game.d64 and (with the disc) droid.d64 (builds the BBC game into build/bbc first)
+    make CHEAT=1    the test build in build/c64-cheat: keys 1-9, 0, Q, W go to levels 1-12 (at the right lift), E fills energy, pass
+                    cards and cells, R gives the microfilm, the key and the spanner, T the jet pack; the player cannot die
+    make PROFILE=1  the border shows the time: blue the game, red the screen matrix
     make zip        build/c64/codename-droid-c64.zip: the PRG, the disk image, run.sh and this file
-    make test       the headless checks in the 6502 simulator (minutes)
+    make test       the headless checks in the 6502 simulator (no emulator)
     make help
 
-## Notes
+## How the game works
 
-- `C64-README.md`: how the C64 port works (the display layer, the 40-column window, sound, the loading screens), what has
-  been verified and what has not, the memory map and the tools.
-- `bbc/README.md`: the BBC rebuild.
+Keys are as in the controls table above.
+
+- **The level** (`src/level.s`): at level load the BBC's tiles (4 x 4 cells, from the BBC game's own tile art, flips and all)
+  are made into characters, each distinct 8-byte cell once (`intern`: hashed, compared), at most 203 a level (the largest
+  needs 179). The level is `ROWS`, 32 rows of 256 character numbers, and `BPAT`, each character's BBC bytes, which the
+  rules read as the BBC reads its screen. The map of tiles (`LTILES`, a page a level) is the BBC's, edited by the game's
+  events (lifts, pillars, doors...).
+- **The display** (`view.s`): a window of 40 x 25 cells onto `ROWS`, in two screen matrices (`$c800`, `$cc00`), one shown
+  while the other is made (the shown one shifted by a block copy, a new column or row from `ROWS`), and the raster interrupt
+  swaps them together with the VIC-II's fine scroll and the sprites, so nothing tears. 38-column mode hides the scroll's
+  edges. The camera shows 25 of the level's 32 rows and moves by a row.
+- **The player** is two sprites (21 + 11 lines; three for crawling, which is 7 cells wide), drawn exactly where the game's
+  step has put it (the picture never glides: when the machine is slow the game takes several steps a frame, and a trailing
+  picture would overlap the ground the game had already cleared); **blasters** are sprites 3 - 7; **enemies, objects, mines and explosions** are characters written
+  into `ROWS` and both matrices (`put_cell`) as they change. Each visible enemy keeps the twelve cells under its picture so
+  they can be put back; the character groups start after the current level's glyphs and scale to the available space, up to
+  ten groups. Enemies and the player's collisions use the BBC's way: a point of the player's picture
+  against the enemy's byte.
+- **The rules** (`player.s`, `objects.s`, `enemy.s`, `blaster.s`, `events.s`) keep the BBC's names and order of play:
+  `game_step` is its main loop without the display, run every 4 PAL frames (4.8 NTSC), as the BBC's loop took 4. The BBC keeps
+  the player as a screen address; here `pc` (cell column) and `py` (line) are that address, `px` the BBC's `player_x`.
+- **Screens** (`screens.s`, `title.s`): the wrist terminal, the map, the jet pack computer, game over and the completion
+  screen are made of characters too (a backdrop of tiles as level 12 / 13, the BBC's font as shared glyph characters, its
+  sprites composited into the cells under them); the title is the BBC's own screen, taken from the BBC game running in
+  `tools/bbcsim.py`, with the player walking on the spot and firing.
+- **Sound** is the SID driver (`src/sound.s`) with the BBC's sound calls (`sfx.s`).
+
+## Memory
+
+The program and sprite source blocks occupy `$0801-$9fff`. `$a000-$bfff` is `ROWS`; `$c000` is the active character set,
+`$c800` / `$cc00` the screen matrices, and `$d000-$dfff` the sprites (VIC-II bank 3). The lift temporarily uses `$d000`
+for its ride charset, `$d800` for the rebuilt level charset, and `$de80-$df3f` for the player's ride sprites; this all sits
+under the I/O area, which the CPU maps out only while copying. `$e000` is `LTILES`, `$ee00` `BPAT`, `$f600` the sharing
+tables, `$fa00` the sound driver's variables; `$0200` variables.
+
+## Checking it
+
+`tools/make_data.py` makes `game_data.inc` (tiles, levels, sprites, the title...) from the BBC game's own data.
+`tools/sim_check.py` runs it headless (6502 simulator, a model of the raster, keys and interrupts) and renders the screen.
+`tools/test_enemy_pool.py` checks the new-game start and character-group capacity on the two crowded early levels.
+`tools/test_lift.py` exercises the ride, next-level rebuild, and charset/sprite display handoff in the raster simulator.
+`tools/test_vs_bbc.py [iterations] [seed] [deepest]` runs it against the BBC game with the same keys: after each pass
+of the main loop the player's state, the energies, the objects carried and the enemies' variables must agree. They do, for
+hundreds to thousands of iterations on levels 0, 3 and 6, with random play; where they differ the BBC's own pixels are the
+cause (its sprites leave remnants and carve holes in the ground, which the rules then read; here the sprites are not in the
+level). The collisions with enemy fire, mines and the terminal are not in that test.
+
+## Differences from the BBC
+
+- The picture scrolls smoothly; the player, the enemies and the rules move a cell at a time as on the BBC, the bullets smoothly.
+- The screen shows 25 of the level's 32 rows (the camera), and 40 of its columns instead of 32.
+- Sprites do not overwrite the background, so a player or an enemy in front of a rope or a chain leaves it showing.
+- The title does not scroll in. The instruction pages, the pictures and the credits (the BBC disc's front end, `src/intro.s`) are a program of their own, `intro/` -> `build/c64/intro.prg`: it shows them, then loads `GAME` over itself and runs it (`droid.d64` has both; `game.prg` alone starts at the title). Not run on a C64 or in VICE: the sim reaches its KERNAL LOAD call.
+- A lift ride (`lift.s`) scrolls the 40 columns at the lift's end of the old and new levels past the fixed cabin and player.
+  The new level is built into separate row/charset storage while the ride remains visible, then the display switches to the
+  rebuilt level at landing without the former black rebuild.
+- Mines exploding use the cell of the mine, not the half cell the BBC may use; the pillars of the shrine's sector three kill by
+  a test of the player's four points against the pillar's cells.

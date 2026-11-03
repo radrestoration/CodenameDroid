@@ -1,639 +1,1039 @@
-; enemy.s: the enemy update's shortcuts, and the objects of a level entered by a lift. Runs from $f600 (the HIGHC segment; the
-; engine's own code has no room left below $a000).
-;
-; update_enemies runs every enemy of the level, however far from the window. For each it buffers the pixels at the player's
-; four collision points and at the colliding blasters before the enemy is plotted, and compares them after. An enemy that is
-; not plotted changes nothing on the screen, so for an enemy well outside the window both are the same bytes, read and
-; restored, and the test cannot find a collision: the buffering and the test are skipped for it (about 1,700 cycles an enemy;
-; the mines are still tested, by position).
+; ---- the enemies (update_enemies and what it calls in the BBC game). An enemy is five bytes as the BBC has them; its picture is
+; twelve characters of the pool, written into ROWS where it stands (the cells under it are kept to put back).
 
-.segment "HIGHC"
+.segment "BSS"
+ev_x:       .res 1
+ev_y:       .res 1
+ev_state:   .res 1
+ev_prev:    .res 1
+ev_raw:     .res 1              ; tile fraction and frame as stored
+ev_ff:      .res 1              ; the tile fraction
+ev_energy:  .res 1
+ev_col:     .res 1
+ev_g:       .res 1
+ev_drawn:   .res 1
+pg_col:     .res 10
+pg_row:     .res 10
+pg_img:     .res 10
+pool_base:  .res 1
+pool_groups:.res 1
+seed:       .res 1
+ev_idx:     .res 1
+ev_dir:     .res 1
+ev_row:     .res 1
+ro_x:       .res 1
+ro_y:       .res 1
+ro_i:       .res 1
+enemy_under: .res 12
+.segment "CODE"
 
-; c64_buffer_if_near: instead of buffer_player_points_and_blasters. The enemy is far if its column (4 a tile, without the
-; fraction and the offset of a flipped sprite: at most 5 more) is more than 12 columns from the window's.
-c64_buffer_if_near:
-    lda enemy_tile_x
+; rnd: a byte
+rnd:
+    lda seed
     asl
-    asl
-    sec
-    sbc left_edge_x_fraction
-    sec
-    sbc left_edge_tile_address_low
-    cmp #RING_W + 12
-    bcc @near
-    cmp #256 - 12
-    bcs @near
+    bcc :+
+    eor #$1d
+:   sta seed
+    eor tick
+    rts
+
+; get_cell: the character at column X, row Y
+get_cell:
     lda #0
-    sta c64_enear
-    rts
-@near:
-    lda #1
-    sta c64_enear
-    jmp buffer_player_points_and_blasters
-
-; c64_check_if_near: instead of check_for_enemy_collision_with_blasters_and_player
-c64_check_if_near:
-    lda c64_enear
-    bne @check
-    rts
-@check:
-    jmp check_for_enemy_collision_with_blasters_and_player
-
-; The lifts' scrolls draw tiles only: the game plots an object a column at a time as an edge of the window passes it. The BBC's
-; 32 columns start clear of the objects; the wider window can have an object across its edge or inside it, so after the scroll
-; every object (not collected) in the window is plotted, column by column, as the edges would have. An object's column c is
-; at level x = objects_x + 1 + c.
-c64_scroll_down_objs:
-    jsr scroll_down
-    jmp c64_plot_window_objects
-c64_scroll_up_objs:
-    jsr scroll_up
-c64_plot_window_objects:
-.if RING_W = 32
-    rts
-.else
-    lda level
-    cmp #$0c
-    bcc @go
-    rts
-@go:
+    sta p2
+    tya
     clc
-    lda left_edge_tile_address_low
-    adc left_edge_x_fraction
-    sta PO_L
-    lda level
-    asl
-    asl
-    sta PO_I
-    lda #4
-    sta PO_K
-@obj:
-    ldx PO_I
-    lda objects_x,x
-    cmp #$ff
-    beq @next                   ; (no object)
-    lda objects_type_and_flags,x
-    and #$0f
-    bne @next                   ; collected
-    lda objects_type_and_flags,x
-    and #$f0
-    lsr
-    lsr
-    sta PO_H                    ; the type * 4
-    lda #0
-    sta PO_X                    ; the window column
-@cx:
-    ldx PO_I
-    lda PO_L                    ; the object's column here: x - objects_x - 1, if it is under the object's width
-    clc
-    adc PO_X
-    sbc objects_x,x             ; (carry clear: one more)
-    ldy PO_H
-    cmp object_types_sprite_address_and_sizes + 3,y
-    bcs @nx
-    tax
-    lda #0
-    sta object_sprite_offset
-    cpx #0
-    beq @m1
-@m: clc
-    adc object_types_sprite_address_and_sizes + 2,y
-    dex
-    bne @m
-    sta object_sprite_offset
-@m1:
-    lda PO_X
-    sta object_screen_x
-    ldx PO_I
-    stx object_to_plot
-    lda objects_type_and_flags,x
-    lsr
-    lsr
-    lsr
-    lsr
-    tax
-    jsr plot_object
-@nx:
-    inc PO_X
-    lda PO_X
-    cmp #RING_W
-    bcs @next
-    jmp @cx
-@next:
-    inc PO_I
-    dec PO_K
-    beq @ret
-    jmp @obj
-@ret:
-    rts
-.endif
-
-
-; update_enemies' copies of an enemy's four variables (x, y, direction and state, fraction and frame) to the working copy and
-; back; X leaves as the loops left it: the enemy's offset + 4
-c64_get_enemy_vars:
-    ldx enemy_to_update
-    lda enemies_variables,x
-    sta enemy_variables
-    lda enemies_variables + 1,x
-    sta enemy_variables + 1
-    lda enemies_variables + 2,x
-    sta enemy_variables + 2
-    lda enemies_variables + 3,x
-    sta enemy_variables + 3
-    inx
-    inx
-    inx
-    inx
-    jmp c64_get_enemy_done
-
-c64_set_enemy_vars:
-    ldx enemy_to_update
-    lda enemy_variables
-    sta enemies_variables,x
-    lda enemy_variables + 1
-    sta enemies_variables + 1,x
-    lda enemy_variables + 2
-    sta enemies_variables + 2,x
-    lda enemy_variables + 3
-    sta enemies_variables + 3,x
-    inx
-    inx
-    inx
-    inx
-    jmp c64_set_enemy_done
-
-; ------------------------------------------------------------------------------------------------
-; The enemies' sprites. An enemy is three columns of 32 bytes (column by column in the sprite data), which the BBC's loops plot
-; a byte at a time, with the screen address worked out for each (about 40 cycles a byte). Here a group of 8 rows is done at a
-; time: the three columns' cells are addressed by three self-modified stores, the row in the group is Y. Done where the plot
-; starts on a cell (screen address a multiple of 8), is 3 columns wide and a whole number of groups tall; anything else goes
-; to the BBC's loops (the jump replaced the instruction in front of them, which is done first). The screen addresses and the
-; width are left as the loops leave them.
-ENEMY_SA = $3a78                ; (the flipped plot's sprite address: the operand of its load)
-
-
-; c64_swap_hook: the enemy sprites are about to be rewritten (swap_enemy_colours)
-c64_swap_hook:
-    jsr e3_forget
-    lda #$0a                    ; (what the call replaced)
-    sta $71
-    rts
-
-e3_wrap:
-    WRAP_CELL zp_ci
-    rts
-
-; e3_forget: the memo is empty (a high byte of 0 is no sprite's). Needed when the characters are all new (cells_reset): a
-; character the memo remembers may be on the free list.
-e3_forget:
-    lda #0
-    ldx #127
-e3_f:
-    sta MEMHI,x
-    dex
-    bpl e3_f
-    rts
-
-; e3_cell: the cell zp_ci has just had its 8 bytes written from the sprite bytes at e3_key. The character for them is the one the
-; cell got the last time the same source was plotted, so that is remembered (a memo of 256 entries by source address): no dirty
-; list, no hash, no comparing. Otherwise update_cell finds or makes the character, and it is remembered. (The enemies' sprites
-; are changed in place when a level starts: c64_swap_hook forgets them. Sources elsewhere are not remembered: some of the game's
-; graphics change as it plays.)
-e3_cell:
-    lda e3_key + 1              ; only the sprites that do not change while the game plays are remembered. The enemies' are in
-    ldx e3_fl                   ; page $0a-$0b (a flipped plot's address has bit 14 set; the flip is checked, so no other sprite is
-    bmi e3_tl                   ; mistaken for one); a tile's (e3_fl = $80) are anywhere but there, with bit 13 set (c64_tile_begin)
-    and #$fe
-    eor e3_fl
-    cmp #$0a
-    bne e3_nm
-    beq e3_use
-e3_tl:
-    cmp #$20                    ; (page 0)
-    beq e3_nm
-    and #$fe
-    cmp #$2a                    ; (the enemies' sprites, which are rewritten in place)
-    bne e3_use
-e3_nm:
-    jmp update_cell             ; (not remembered)
-e3_use:
-    lda e3_key                  ; the memo entry: bits of the address, mixed
-    lsr
-    eor e3_key + 1
-    and #$7f
-    sta e3_idx
-    tax
-    lda MEMLO,x
-    cmp e3_key
-    bne e3_miss
-    lda MEMHI,x
-    cmp e3_key + 1
-    bne e3_miss
-    ldy MEMC,x
-    lda VER,y                   ; (the character must still be the pattern it was)
-    cmp MEMV,x
-    bne e3_miss
-    sty zp_c
-    jmp uc_have                 ; (zp_ci and zp_c: the cell takes the character, if it is not the one it has)
-e3_miss:
-    jsr update_cell
-    lda zp_ci + 1
-    clc
-    adc #>CELLCHAR
-    sta zp_u + 1
-    lda #0
-    sta zp_u
-    ldy zp_ci
-    lda (zp_u),y                ; the character the cell has now (if there was none to be had, the old one: not remembered)
-    sta zp_c
-    tax
-    jsr cell_is                 ; (zp_p1 is still the cell's bytes)
-    bne e3_nok
-    ldx e3_idx
-    lda zp_c
-    sta MEMC,x
+    adc rows_page
+    sta p2 + 1
+    txa
     tay
-    lda VER,y
-    sta MEMV,x
-    lda e3_key
-    sta MEMLO,x
-    lda e3_key + 1
-    sta MEMHI,x
-e3_nok:
+    lda (p2),y
     rts
 
-; e3_pre: carry clear if the plot can be done here (see above); e3_cnt = the groups of 8 rows
-e3_pre:
-    lda screen_address_low
+update_enemies:
+    jsr consider_using_keys
+    inc frame_counter
+    lda seed
+    bne :+
+    lda #$a5
+    sta seed
+:   lda #0
+    sta enemy_to_update
+@loop:
+    lda enemy_to_update
+    cmp last_enemy
+    bne :+
+    rts
+:   tax
+    lda enemies,x
+    sta ev_x
+    lda enemies + 1,x
+    sta ev_y
+    lda enemies + 2,x
+    sta ev_prev
+    and #$0f
+    sta ev_state
+    lda enemies + 3,x
+    sta ev_raw
+    lda enemies + 4,x
+    sta ev_energy
+    lda ev_x
+    bpl :+
+    jmp @store
+:   lda ev_raw
     and #7
-    bne e3_no
-    lda width
-    beq e3_no
+    sta ev_ff
+    jsr plot_enemy_step
+    ; write back before the collisions
+    ldx enemy_to_update
+    lda ev_x
+    sta enemies,x
+    lda ev_prev
+    and #$f0
+    clc
+    adc ev_state
+    sta enemies + 2,x
+    lda ev_raw
+    and #$f0
+    clc
+    adc ev_ff
+    sta enemies + 3,x
+    jsr enemy_collisions
+    ; reload what the collisions may have changed
+    ldx enemy_to_update
+    lda enemies + 2,x
+    and #$0f
+    sta ev_state
+    lda enemies + 3,x
+    sta ev_raw
+    lda enemies + 4,x
+    sta ev_energy
+    lda enemies,x
+    sta ev_x
+    ; the animation
+    lda ev_state
+    and #2
+    beq @nst
+    lda ev_state
     cmp #4
-    bcs e3_no
-    sta e3_nc
-    lda height
-    beq e3_no
-    and #7
-    bne e3_no
-    lda height
-    cmp #41
-    bcs e3_no
-    lsr
-    lsr
-    lsr
-    sta e3_cnt
-    lda screen_address_low
-    sta e3_gp
-    lda screen_address_high
-    sta e3_gp + 1
+    bcs @nst
+    lda #$f0
+    sta ev_raw
+@nst:
+    lda ev_raw
+    and #$f0
     clc
-    rts
-e3_no:
-    sec
-    rts
-
-; e3_cells: the three cells of the group of rows just plotted (e3_gp: the first column's cell, e3_s0: the first column's source in
-; the order of the columns, e3_fl: 0 or $40, the plot's flip), through e3_cell. A column on is 8 bytes on in the ring (round
-; its end) and a height before (flipped) or after in the sprite.
-e3_cells:
-    ldx e3_nc
-    stx e3_k
-    lda e3_s0
-    sta e3_a
-    lda e3_s0 + 1
-    sta e3_a + 1
-    lda e3_gp + 1               ; the first cell's index (zp_ci is not changed by e3_cell: the next columns are the next cells)
-    ldx e3_gp
-    jsr addr_to_cell
-e3_col:
-    lda e3_a
-    sta e3_key
-    lda e3_a + 1
-    ora e3_fl
-    sta e3_key + 1
-    jsr e3_cell
-    dec e3_k
-    beq e3_cd
-    inc zp_ci
-    bne e3_ci1
-    inc zp_ci + 1
-e3_ci1:
-    jsr e3_wrap
-    lda e3_fl                   ; and a height on (or back) in the sprite
-    bne e3_back
-    clc
-    lda e3_a
-    adc height
-    sta e3_a
-    bcc e3_col
-    inc e3_a + 1
-    bne e3_col
-e3_back:
-    sec
-    lda e3_a
-    sbc height
-    sta e3_a
-    lda e3_a + 1
-    sbc #0
-    sta e3_a + 1
-    jmp e3_col
-e3_cd:
-    rts
-
-; e3_run: the plot, in groups of 8 rows. Carry set if it was not done (the caller goes on into the BBC's loops).
-; The row loop is the flipped one (the byte through flip_table); a plot that is not flipped has the flip's four bytes (tax, lda
-; flip_table,x) made a BIT of page 0 and a NOP (6 cycles, as they are).
-e3_tu:   .byte $2c,0,0,$ea     ; bit $0000 / nop: what an unflipped plot has where the flip is
-e3_tf:   .byte $aa,$bd,<flip_table,>flip_table
-
-e3_run:
-    jsr e3_pre
-    bcs e3_no
-    ldy #3                      ; the flip's four instructions, for three columns
-    ldx #3
-    lda e3_fl
-    beq e3_fx
-    ldx #7
-e3_fx:
-    lda e3_tu,x
-    sta FX0,y
-    sta FX1,y
-    sta FX2,y
-    dex
-    dey
-    bpl e3_fx
-e3_src:
-    lda e3_s0                   ; the columns' sprite addresses: SA0, and SA1, SA2 a column on (or before: flipped)
-    sta SA0 + 1
-    lda e3_s0 + 1
-    sta SA0 + 2
-    lda height
-    ldx e3_fl
-    beq e3_p
-    eor #$ff                    ; (minus the height)
-    clc
-    adc #1
+    adc #$10
+    cmp #$60
+    bne :+
+    lda #0
+:   cmp #$a0
+    bne @sk
+    inc ev_state
+    inc ev_state
+    lda #$80
+    ldx ev_state
+    cpx #$0e
+    bcc @sk
     ldx #$ff
-    bne e3_q
-e3_p:
+    stx ev_x
+@sk:
+    sta ev_raw
+    ldx enemy_to_update
+    lda enemies + 3,x
+    and #7
+    clc
+    adc ev_raw
+    sta enemies + 3,x
+    lda ev_x
+    sta enemies,x
+    lda ev_prev
+    and #$f0
+    clc
+    adc ev_state
+    sta enemies + 2,x
+    lda ev_energy
+    sta enemies + 4,x
+    jmp @next
+@store:
+    ; (an enemy that is not there: its picture, if any, goes)
+    jsr enemy_gone
+@next:
+    lda enemy_to_update
+    clc
+    adc #5
+    sta enemy_to_update
+    jmp @loop
+
+enemy_gone:
+    jsr find_group
+    cpx #$ff
+    beq @r
+    jsr erase_group
+    lda #$ff
+    sta pool_owner,x
+@r: rts
+
+; ---- the pool of characters
+; find_group: the group of enemy_to_update in X ($ff if none)
+pool_configure:
+    lda nchars
+    sta pool_base
+    lda #$fc
+    sec
+    sbc pool_base
+    sta zt
+    lda #0
+    sta pool_groups
+@count:
+    lda zt
+    cmp #12
+    bcc @done
+    sec
+    sbc #12
+    sta zt
+    inc pool_groups
+    lda pool_groups
+    cmp #10
+    bne @count
+@done:
+    rts
+
+find_group:
+    lda pool_groups
+    beq @none
+    tax
+    dex
+@l: lda pool_owner,x
+    cmp enemy_to_update
+    beq @r
+    dex
+    bpl @l
+@none:
+    ldx #$ff
+@r: rts
+
+; erase_group: X the group: the cells it covered are put back
+erase_group:
+    lda pg_col,x
+    cmp #$ff
+    beq @r
+    stx zx
+    lda #0
+    sta zr                      ; the cell 0 - 11
+@l: ; the cell's place
+    lda zr
+    jsr cell_xy                 ; zc column offset, zk row offset
+    ldx zx
+    lda pg_col,x
+    clc
+    adc zc
+    sta zs
+    lda pg_row,x
+    clc
+    adc zk
+    pha
+    lda zx
+    asl
+    clc
+    adc zx
+    asl
+    asl                         ; group * 12
+    clc
+    adc zr
+    sta zt
+    ldx zs
+    pla
+    tay
+    pha
+    jsr get_cell
+    sec
+    sbc pool_base
+    cmp zt
+    bne @skip                   ; another enemy's character is on top: leave it
+    pla
+    tay
+    ldx zt
+    lda pool_under,x
+    ldx zs
+    jsr put_cell
+    jmp @next
+@skip:
+    pla
+@next:
+    inc zr
+    lda zr
+    cmp #12
+    bne @l
+    ldx zx
+    lda #$ff
+    sta pg_col,x
+@r: rts
+
+; cell_xy: cell number A (0 - 11): column offset in zc, row offset in zk
+cell_xy:
     ldx #0
-e3_q:
-    stx zp_t                    ; the high byte of +-height
-    sta zp_u                    ; and the low
-    clc
-    lda SA0 + 1
-    adc zp_u
-    sta SA1 + 1
-    lda SA0 + 2
-    adc zp_t
-    sta SA1 + 2
-    clc
-    lda SA1 + 1
-    adc zp_u
-    sta SA2 + 1
-    lda SA1 + 2
-    adc zp_t
-    sta SA2 + 2
-e3_group:
-    lda e3_gp
-    sta DC0 + 1
-    lda e3_gp + 1
-    sta DC0 + 2
-    clc
-    lda e3_gp
-    adc #8
-    sta DC1 + 1
-    lda e3_gp + 1
-    adc #0
-    cmp #$80
-    bcc e3_c1
-    lda #RING_HI
-e3_c1:
-    sta DC1 + 2
-    clc
-    lda e3_gp
-    adc #16
-    sta DC2 + 1
-    lda e3_gp + 1
-    adc #0
-    cmp #$80
-    bcc e3_c2
-    lda #RING_HI
-e3_c2:
-    sta DC2 + 2
-    lda e3_nc                   ; (a plot of one or two columns: the others are written where nothing is)
+    stx zk
     cmp #3
-    bcs e3_full
-    lda #<e3_dummy
-    sta DC2 + 1
-    lda #>e3_dummy
-    sta DC2 + 2
-    lda e3_nc
-    cmp #2
-    bcs e3_full
-    lda #<e3_dummy
-    sta DC1 + 1
-    lda #>e3_dummy
-    sta DC1 + 2
-e3_full:
-    ldy #0
-e3_row:
-SA0:
-    lda $ffff,y
-FX0:
-    tax
-    lda flip_table,x
-DC0:
-    sta $ffff,y
-SA1:
-    lda $ffff,y
-FX1:
-    tax
-    lda flip_table,x
-DC1:
-    sta $ffff,y
-SA2:
-    lda $ffff,y
-FX2:
-    tax
-    lda flip_table,x
-DC2:
-    sta $ffff,y
-    iny
-    cpy #8
-    bne e3_row
-    lda SA0 + 1                 ; this group's cells
-    sta e3_s0
-    lda SA0 + 2
-    sta e3_s0 + 1
-    jsr e3_cells
-    dec e3_cnt
-    beq e3_end
-    clc                         ; the next group of rows: a stride down, round the ring, and the sprite columns 8 on
-    lda e3_gp
-    adc #<STRIDE
-    sta e3_gp
-    lda e3_gp + 1
-    adc #>STRIDE
-    cmp #$80
-    bcc e3_n1
-    sbc #RING_SZ_HI
-e3_n1:
-    sta e3_gp + 1
-    ldx #0
-e3_adv:                         ; (SA0, SA1, SA2 are 10 bytes apart in the loop)
+    bcc :+
+    sec
+    sbc #3
+    inc zk
+    cmp #3
+    bcc :+
+    sec
+    sbc #3
+    inc zk
+    cmp #3
+    bcc :+
+    sec
+    sbc #3
+    inc zk
+:   sta zc
+    rts
+
+; install_group: group X gets the picture (image ev_dir * 16 + zv) as its twelve characters
+fr96_lo:
+    .repeat 11, i
+    .byte <(i * 96)
+    .endrepeat
+fr96_hi:
+    .repeat 11, i
+    .byte >(i * 96)
+    .endrepeat
+
+install_group:
+    stx zx
+    ldy zv
+    lda fr96_lo,y
     clc
-    lda SA0 + 1,x
-    adc #8
-    sta SA0 + 1,x
-    bcc e3_n2
-    inc SA0 + 2,x
-e3_n2:
+    adc #<enemy_frames_left
+    sta p3
+    lda fr96_hi,y
+    adc #>enemy_frames_left
+    sta p3 + 1
+    ldx level
+    lda level_swap,x
+    sta zm
+    lda #0
+    sta zr
+@c: ; the cell of the left-facing picture this one is made from: the same, or for the right the mirror image across the row
+    lda zr
+    ldx ev_dir
+    bne @src
+    jsr mirror_cell_index
+@src:
+    asl
+    asl
+    asl
+    tay
+    ldx #0
+@b: lda (p3),y
+    sta zt
+    lda ev_dir
+    bne @nm
+    stx zs
+    ldx zt
+    lda mirror_table,x
+    sta zt
+    ldx zs
+@nm:
+    lda zm
+    beq @plain
+    lda zt                      ; colours 1 and 3 swapped: the high bit of each pixel ^= its low bit
+    and #$0f
+    asl
+    asl
+    asl
+    asl
+    eor zt
+    jmp @put
+@plain:
+    lda zt
+@put:
+    sta cb,x
+    iny
+    inx
+    cpx #8
+    bne @b
+    lda zx
+    asl
+    clc
+    adc zx
+    asl
+    asl
+    clc
+    adc zr
+    clc
+    adc pool_base
+    jsr set_char
+    inc zr
+    lda zr
+    cmp #12
+    bne @c
+    ldx zx
+    rts
+
+; mirror_cell_index: cell A (0 - 11, 3 to a row) -> the cell at the other end of its row
+mirror_cell_index:
+    tax
+    lda mirror_cell,x
+    rts
+mirror_cell:
+    .byte 2, 1, 0, 5, 4, 3, 8, 7, 6, 11, 10, 9
+
+; alloc_group: a free group in X ($ff if none), for enemy_to_update
+alloc_group:
+    lda pool_groups
+    beq @none
+    tax
+    dex
+@l: lda pool_owner,x
+    cmp #$ff
+    beq @f
+    dex
+    bpl @l
+@none:
+    ldx #$ff
+    rts
+@f: lda enemy_to_update
+    sta pool_owner,x
+    lda #$ff
+    sta pg_col,x
+    sta pg_img,x
+    rts
+
+; draw_enemy: ev_col, the row ev_y * 4, the picture ev_dir / zv (255 for none, a blank)
+draw_enemy:
+    jsr find_group
+    lda zv
+    cmp #$ff
+    bne @pic
+    cpx #$ff
+    beq @r
+    jsr erase_group
+    lda #$ff
+    sta pool_owner,x
+@r: rts
+@pic:
+    cpx #$ff
+    bne @have
+    jsr alloc_group
+    cpx #$ff
+    beq @r
+@have:
+    stx ev_g
+    lda ev_y
+    asl
+    asl
+    sta ev_row
+    ; the picture
+    lda ev_dir
+    asl
+    asl
+    asl
+    asl
+    ora zv
+    cmp pg_img,x
+    beq :+
+    pha
+    jsr install_group
+    ldx ev_g
+    pla
+    sta pg_img,x
+:   ; what lies under the new place (read before anything changes, so it may include this group's own old cells)
+    lda #0
+    sta zr
+@u: lda zr
+    jsr cell_xy
+    lda ev_col
+    clc
+    adc zc
+    tax
+    lda ev_row
+    clc
+    adc zk
+    tay
+    jsr get_cell
+    jsr resolve_under
+    ldx zr
+    sta enemy_under,x
+    inc zr
+    lda zr
+    cmp #12
+    bne @u
+    ; the old cells outside the new place go back; the others are written over, so the picture is never missing
+    jsr release_old
+    ldx ev_g
+    lda ev_col
+    sta pg_col,x
+    lda ev_row
+    sta pg_row,x
+    lda #0
+    sta zr
+@l: lda zr
+    jsr cell_xy
+    lda ev_col
+    clc
+    adc zc
+    sta zs
+    lda ev_row
+    clc
+    adc zk
+    sta zl
+    lda ev_g
+    asl
+    clc
+    adc ev_g
+    asl
+    asl
+    clc
+    adc zr
+    tax
+    ldy zr
+    lda enemy_under,y
+    sta pool_under,x
     txa
     clc
-    adc #10
+    adc pool_base
+    ldx zs
+    ldy zl
+    jsr put_cell
+    inc zr
+    lda zr
+    cmp #12
+    bne @l
+    rts
+
+; release_old: the cells of group ev_g's old place that the new place does not cover are put back
+release_old:
+    ldx ev_g
+    lda pg_col,x
+    cmp #$ff
+    beq @r
+    lda #0
+    sta zr
+@l: lda zr
+    jsr cell_xy
+    ldx ev_g
+    lda pg_col,x
+    clc
+    adc zc
+    sta ro_x
+    lda pg_row,x
+    clc
+    adc zk
+    sta ro_y
+    lda ro_x
+    sec
+    sbc ev_col
+    cmp #3
+    bcs @out
+    lda ro_y
+    sec
+    sbc ev_row
+    cmp #4
+    bcc @next                   ; still covered
+@out:
+    lda ev_g
+    asl
+    clc
+    adc ev_g
+    asl
+    asl
+    clc
+    adc zr
+    sta ro_i
+    clc
+    adc pool_base
+    sta zt
+    ldx ro_x
+    ldy ro_y
+    jsr get_cell
+    cmp zt
+    bne @next                   ; another enemy's character is on top: leave it
+    ldx ro_i
+    lda pool_under,x
+    ldx ro_x
+    ldy ro_y
+    jsr put_cell
+@next:
+    inc zr
+    lda zr
+    cmp #12
+    bne @l
+@r: rts
+
+; resolve_under: a pool character is replaced by what lies under it
+resolve_under:
+    cmp #$fc
+    bcs @r
+    cmp pool_base
+    bcc @r
+    sec
+    sbc pool_base
     tax
-    cpx #30
-    bcc e3_adv
-    jmp e3_group
-e3_end:
-    lda #0                      ; what the loops leave: width 0 (and no marking by the hook: the cells are done)
-    sta width
-    sta hk_cols
-    lda e3_fl
-    bne e3_done
-    lda e3_nc                   ; (plot_sprite: the screen address is left at the last column's last row's byte: 8 * columns - 1 on)
+    lda pool_under,x
+@r: rts
+
+; ---- consider_plotting_enemy
+plot_enemy_step:
+    lda ev_ff
+    cmp #4
+    bne :+
+    lda #0
+    sta ev_ff
+    jsr move_enemy
+:   lda ev_state
+    cmp #2
+    bcc @moving
+    dec ev_ff
+    lda ev_ff
+    cmp #$ff
+    bne @moving
+    lda #3
+    sta ev_ff
+@moving:
+    ; the cell column of its left edge
+    lda ev_x
     asl
     asl
-    asl
+    ldx ev_state
+    sta zt
+    txa
+    and #1
+    sta ev_dir
+    bne @left
+    lda zt
+    sec                         ; (the BBC plots after the fraction has gone up by one)
+    adc ev_ff
+    jmp @col
+@left:
+    lda zt
+    sec
+    sbc ev_ff
     sec
     sbc #1
-    clc
-    adc e3_gp
-    sta screen_address_low
-    lda e3_gp + 1
-    adc #0
-    cmp #$80
-    bcc e3_w2
-    lda #RING_HI
-e3_w2:
-    sta screen_address_high
-e3_done:
-    clc
-    rts
-
-c64_fenemy_go:
-    sta $3a79                   ; (what the jump replaced)
-    lda ENEMY_SA
-    sta e3_s0
-    lda ENEMY_SA + 1
-    sta e3_s0 + 1
-    lda #$40
-    sta e3_fl
-    jsr e3_run
-    bcs c64_fenemy_slow
-    rts
-c64_fenemy_slow:
-    jmp plot_flipped_enemy_column_loop
-
-c64_sprite_go:
-    sta plot_sprite_address_high ; (what the jump replaced)
-    lda sprite_offset           ; not a plot from the middle of the sprite, nor a vertically flipped one
-    bne c64_sprite_no
-    lda plot_sprite_next_byte_opcode
-    cmp #$e8
-    beq c64_sprite_yes
-c64_sprite_no:
-    jmp plot_sprite_column_loop
-c64_sprite_yes:
-    lda $72
-    sta e3_s0
-    lda $73
-    sta e3_s0 + 1
-    lda #0
-    sta e3_fl
-    jsr e3_run
-    bcs c64_sprite_no
-    rts
-
-; ------------------------------------------------------------------------------------------------
-; A column of tiles (plot_column_of_tiles): a tile is four cells, each the same 8 bytes whenever the tile, its fraction (the
-; part of it that is in the column) and its flipping are the same. c64_tile_begin, where the BBC's code has settled the
-; flipping, notes where the tile's bytes come from: the sprite address ($72/$73) and a fraction of 32 bytes, with the flipping in
-; the bottom bits (the addresses are in the tile graphics, from $8000: no sprite of an enemy is). c64_tile_end, after the four
-; cells are plotted, gives each its character as e3_cell does, and the column's hook marks nothing.
-
-c64_tile_begin:
-    lda screen_address_low      ; the tile's first cell
-    sta t_sa
-    lda screen_address_high
-    sta t_sa + 1
-    lda $77                     ; tile_x_fraction
-    ldy $59                     ; the flipping
-    cpy #2
-    bcc t_k1
-    lda #3                      ; (a horizontally flipped tile is read from the other end of its four fractions)
+@col:
+    sta ev_col
+    ; the picture
+    lda ev_state
+    cmp #4
+    bcs @skel
+    lda ev_raw
+    lsr
+    lsr
+    lsr
+    lsr
+    sta zv
+    jmp @vis
+@skel:
+    and #$0e
     sec
-    sbc $77
-t_k1:
-    asl
-    asl
-    asl
-    asl
-    asl
+    sbc #4
+    lsr
     clc
-    adc $72
-    sta t_key
-    lda $73
-    adc #0
-    ora #$20                    ; (a tile: not mistaken for an enemy's source)
-    sta t_key + 1
-    tya
-    ora t_key
-    sta t_key
-    ldx #0                      ; (what the call replaced)
-    tya
+    adc #6
+    sta zv
+    cmp #10
+    bcc @vis
+    lda #$ff                    ; the last one is blank
+    sta zv
+@vis:
+    ; on the screen (the window with some to spare)?
+    lda ev_col
+    cmp #$fa
+    bcs @hide
+    clc
+    adc #3
+    bcs @hide
+    sec
+    sbc t_w
+    bcc @hide
+    cmp #46
+    bcs @hide
+    jsr draw_enemy
+    ; firing
+    lda ev_state
+    cmp #4
+    bcs @done
+    jsr enemy_fire
+@done:
+    inc ev_ff
+    rts
+@hide:
+    lda #$ff
+    sta zv
+    jsr draw_enemy
+    inc ev_ff
     rts
 
-c64_tile_end:
-    lda #$80                    ; (what e3_cell is told: a tile's)
-    sta e3_fl
-    lda t_key
-    sta e3_key
-    lda t_key + 1
-    sta e3_key + 1
-    lda t_sa + 1
-    ldx t_sa
-    jsr addr_to_cell
-    lda #4
-    sta t_k
-t_cell:
-    jsr e3_cell
-    dec t_k
-    beq t_done
-    clc                         ; the next cell down: 8 more of the sprite, a row on in the ring
-    lda e3_key
-    adc #8
-    sta e3_key
-    bcc t_c1
-    inc e3_key + 1
-t_c1:
+; ---- move_enemy: a step to the next tile
+move_enemy:
+    lda ev_state
+    cmp #4
+    bcs me_ret
+    lda ev_energy
+    and #$f0
+    cmp #$30
+    bcs me_ret
+    lda ev_state
+    bne me_left
+    ; moving right
+    ldx ev_x
+    inx
+    inx
+    ldy ev_y
+    jsr get_tile_at_x_y
+    bne flip_enemy_direction
+    ldx ev_x
+    inx
+    inx
+    ldy ev_y
+    iny
+    jsr get_tile_at_x_y
+consider_flipping:
+    beq flip_enemy_direction
+    cmp #$04
+    beq flip_enemy_direction
+    cmp #$06
+    beq flip_enemy_direction
+    cmp #$0d
+    beq flip_enemy_direction
+    cmp #$d0
+    beq flip_enemy_direction
+    cmp #$40
+    beq flip_enemy_direction
+    cmp #$60
+    beq flip_enemy_direction
+move_left_or_right:
+    lda ev_state
+    bne @l
+    inc ev_x
+    rts
+@l: dec ev_x
+me_ret:
+    rts
+
+flip_enemy_direction:
+    jsr move_left_or_right
+    lda ev_state
+    eor #1
+    sta ev_state
+    rts
+
+me_left:
+    ldx ev_x
+    dex
+    dex
+    ldy ev_y
+    jsr get_tile_at_x_y
+    bne flip_enemy_direction
+    ldx ev_x
+    dex
+    dex
+    ldy ev_y
+    iny
+    jsr get_tile_at_x_y
+    jmp consider_flipping
+
+; get_tile_at_x_y: X tile column, Y tile row: the nibble of the map, masked (so a high nibble is $x0); Z set if space
+get_tile_at_x_y:
+    txa
+    asl
+    asl
+    sta zt
+    tya
+    lsr
     clc
-    lda zp_ci
-    adc #RING_W
-    sta zp_ci
-    bcc t_c2
-    inc zp_ci + 1
-t_c2:
-    jsr e3_wrap
-    jmp t_cell
-t_done:
+    adc zt
+    sta p3
+    lda level
+    clc
+    adc #>LTILES
+    sta p3 + 1
+    ldx #$0f
+    tya
+    and #1
+    beq :+
+    ldx #$f0
+:   stx zt
+    ldy #0
+    lda (p3),y
+    and zt
+    cmp #0
+    rts
+
+; ---- firing
+enemy_fire:
+    jsr player_row
+    stx zt
+    lda ev_y
+    asl
+    asl
+    sec
+    sbc zt
+    cmp #4
+    bcc @inrange
+    cmp #$fe
+    bcs @inrange
+    rts
+@inrange:
+    jsr rnd
+    and #3
+    beq :+
+    rts
+:   ; on the screen
+    lda ev_col
+    sec
+    sbc t_w
+    cmp #36
+    bcc :+
+    rts
+:   ldx #2
+@f: lda bl_ttl,x
+    cmp #$ff
+    beq @found
+    inx
+    cpx #6
+    bne @f
+    rts
+@found:
+    lda ev_state
+    and #1
+    sta bl_dir,x
+    bne @left
+    lda ev_col
+    sec
+    sbc #1
+    cmp px
+    bcc :+
+    rts
+:   lda ev_col
+    clc
+    adc #2
+    jmp @set
+@left:
+    lda ev_col
+    cmp px
+    bcs :+
+    rts
+:   sec
+    sbc #1
+@set:
+    sta bl_c,x
+    lda ev_y
+    asl
+    asl
+    asl
+    asl
+    asl
+    clc
+    adc #13
+    sta bl_l,x
+    lda #$0e
+    sta bl_ttl,x
+    jmp sfx_enemy_fire
+
+; ---- collisions with the player and with mines
+enemy_collisions:
+    ldx enemy_to_update
+    lda enemies + 2,x
+    and #$0f
+    cmp #4
+    bcc :+
+    rts
+:   jsr enemy_vs_player
+    jmp enemy_vs_mines
+
+; the player's four points: (cells, lines) by stance
+point_tab:
+    .byte 2, 0,  0, 0,  2, 27,  0, 27          ; standing
+    .byte 2, 8,  0, 8,  2, 27,  0, 27          ; kneeling
+    .byte 5, 0,  0, 0,  5, 27,  0, 27          ; crawling
+
+enemy_vs_player:
+    jsr find_group
+    cpx #$ff
+    bne :+
+    rts
+:   stx ev_g
+    lda pstance
+    cmp #1
+    beq @kneel
+    cmp #2
+    beq @crawl
+    ldy #0
+    jmp @go
+@kneel:
+    ldy #8
+    jmp @go
+@crawl:
+    ldy #16
+@go:
+    sty zy
     lda #0
-    sta hk_cols                 ; (the hook finds nothing to mark)
-    inc $76                     ; (what the call replaced)
-    lda $76
+    sta zr                      ; the point
+@p: ldy zy
+    lda point_tab,y
+    sta zs                      ; dx
+    lda point_tab + 1,y
+    sta zk                      ; dy
+    lda pc
+    clc
+    adc zs
+    sta sa_c
+    lda py
+    clc
+    adc zk
+    bcs @n
+    sta sa_l
+    lsr
+    lsr
+    lsr
+    tay
+    ldx sa_c
+    jsr get_cell
+    sec
+    sbc pool_base
+    bcc @n
+    ldx #0
+@slot:
+    cmp #12
+    bcc @slot_found
+    sbc #12
+    inx
+    cpx pool_groups
+    bcs @n
+    jmp @slot
+@slot_found:
+    cpx ev_g
+    bne @n
+    jsr rdb
+    tax
+    lda conv_table,x
+    sta zv
+    lda zs
+    ldy zk
+    jsr player_byte
+    cmp zv
+    beq @n
+    jmp enemy_hits_player
+@n: lda zy
+    clc
+    adc #2
+    sta zy
+    inc zr
+    lda zr
+    cmp #4
+    bne @p
     rts
 
-.assert * <= MEMLO, error, "the high code runs into the memo of enemy.s"
+enemy_hits_player:
+    lda suit_energy
+    sec
+    sbc #10
+    sta suit_energy
+    ldx enemy_to_update
+    lda #1
+    sta enemies + 4,x
+    jmp damage_enemy
+
+enemy_vs_mines:
+    ldx enemy_to_update
+    lda enemies + 2,x
+    and #$0f
+    cmp #4
+    bcc :+
+    rts
+:   lda enemies + 1,x
+    asl
+    asl
+    asl
+    asl
+    asl
+    clc
+    adc #24
+    sta zl                      ; feet y
+    lda enemies,x
+    asl
+    asl
+    sta zt
+    lda enemies + 3,x
+    and #7
+    sta zs
+    lda enemies + 2,x
+    and #1
+    bne @left
+    lda zt
+    clc
+    adc zs
+    adc #2
+    jmp @have
+@left:
+    lda zt
+    sec
+    sbc zs
+@have:
+    sta zc
+    ldx #0
+@m: lda mines_state,x
+    bpl @n
+    lda mines_x,x
+    cmp zc
+    bne @n
+    lda mines_y,x
+    cmp zl
+    bne @n
+    lda #0
+    sta mines_state,x
+    stx zx
+    lda mines_x,x
+    sta zs
+    lda mines_y,x
+    lsr
+    lsr
+    lsr
+    tay
+    ldx zs
+    lda #0
+    jsr put_cell
+    ldx enemy_to_update
+    lda #1
+    sta enemies + 4,x
+    jmp damage_enemy
+@n: inx
+    cpx #6
+    bne @m
+    rts
+
+; damage_enemy: X the enemy's offset: a hit of the blaster (or the player or a mine, which set its energy to 1)
+damage_enemy:
+    lda enemies + 2,x
+    and #$0f
+    cmp #4
+    bcs @r
+    stx zx
+    ldy #5
+    ldx #5
+    jsr add_to_score
+    ldx zx
+    dec enemies + 4,x
+    lda enemies + 4,x
+    and #7
+    bne @short
+    lda enemies + 3,x
+    and #7
+    ora #$70
+    sta enemies + 3,x
+    lda enemies + 2,x
+    and #1
+    clc
+    adc #4
+    sta enemies + 2,x
+    lda #8
+    jmp play_sound_for_damage
+@short:
+    lda #2
+    jmp play_sound_for_damage
+@r: rts

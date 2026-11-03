@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A quick headless run of the engine prototype (build/proto/proto.prg): the 6502 with a model of the raster, the keyboard
+"""A quick headless run of the game (build/c64/game.prg): the 6502 with a model of the raster, the keyboard
 and the interrupt. Runs frames with keys held, prints where the actors are and how long the work took, and renders the screen
 (characters, fine scroll, sprites) to a PNG.   sim_check.py [pal|ntsc] [frames] [keys: Z X R] [out.png]"""
 import os
@@ -11,6 +11,13 @@ from sim6502 import CPU  # noqa: E402
 
 RGB = [(0, 0, 0), (255, 255, 255), (136, 0, 0), (170, 255, 238), (204, 68, 204), (0, 204, 85), (0, 0, 170), (238, 238, 119),
        (221, 136, 85), (102, 68, 0), (255, 119, 119), (51, 51, 51), (119, 119, 119), (170, 255, 102), (0, 136, 255), (187, 187, 187)]
+
+
+KEYS = {"X": (0xfb, 0x80), "Z": (0xfd, 0x10), "UP": (0xbf, 0x04), "DOWN": (0xbf, 0x80), "A": (0xfd, 0x04), "J": (0xef, 0x04),
+        "RET": (0xfe, 0x02), "FIRE": (0xbf, 0x20), "STOP": (0x7f, 0x80), "D": (0xfb, 0x04), "O": (0xef, 0x40), "SPACE": (0x7f, 0x10)}
+
+
+NDIR = os.path.join(HERE, "..", os.environ.get("NATIVE", "build/c64"))
 
 
 def labels(path):
@@ -25,7 +32,7 @@ def labels(path):
 class Machine:
     def __init__(self, pal=True):
         self.cpu = c = CPU()
-        data = open(os.path.join(HERE, "..", "build", "proto", "proto.prg"), "rb").read()
+        data = open(os.path.join(NDIR, "game.prg"), "rb").read()
         addr = data[0] | data[1] << 8
         c.m[addr:addr + len(data) - 2] = data[2:]
         c.pc, c.sp, c.i = 0x0810, 0xff, 1
@@ -39,6 +46,8 @@ class Machine:
         c.rd = self.rd
         c.write_hooks.append(self.wr)
         self.base = 0
+        self.shadow = bytearray(4096)
+        self.io = bytearray(4096)
         self.irq_line = 20
 
     def raster(self):
@@ -47,6 +56,8 @@ class Machine:
     def rd(self, a):
         a &= 0xffff
         m = self.cpu.m
+        if 0xd000 <= a < 0xe000 and (m[1] & 7) in (0, 4):
+            return self.shadow[a - 0xd000]
         if a == 0xd012:
             return self.raster() & 255
         if a == 0xd011:
@@ -60,13 +71,22 @@ class Machine:
             return v & 0xff
         if a == 0xdc01:
             v = 0xff
-            for key, (col, mask) in {"Z": (1, 0x10), "X": (2, 0x80), "RET": (0, 0x02)}.items():
-                if key in self.pressed and not (self.col >> col) & 1:
-                    v &= ~mask
+            for key, (colbyte, mask) in KEYS.items():
+                if key in self.pressed:
+                    c = [i for i in range(8) if not (colbyte >> i) & 1][0]
+                    if not (self.col >> c) & 1:
+                        v &= ~mask
             return v & 0xff
         return m[a]
 
     def wr(self, a, v):
+        if 0xd000 <= a < 0xe000:
+            i = a - 0xd000
+            if (self.cpu.m[1] & 7) in (0, 4):             # RAM under the I/O area: the VIC-II sees it, the registers do not
+                self.shadow[i] = v
+                self.cpu.m[a] = self.io[i]
+                return
+            self.io[i] = v
         if a == 0xdc00:
             self.col = v
         if a == 0xd020:
@@ -95,8 +115,8 @@ class Machine:
         import numpy as np
         from PIL import Image
         m = self.cpu.m
-        mat = 0x8000 + ((m[0xd018] >> 4) & 15) * 0x400
-        chars = 0x8000 + ((m[0xd018] >> 1) & 7) * 0x800
+        mat = 0xc000 + ((m[0xd018] >> 4) & 15) * 0x400
+        chars = 0xc000 + ((m[0xd018] >> 1) & 7) * 0x800
         xs = m[0xd016] & 7
         bg = [m[0xd021] & 15, m[0xd022] & 15, m[0xd023] & 15]
         img = np.zeros((200, 320 + 8, 3), dtype=np.uint8)
@@ -104,7 +124,8 @@ class Machine:
             for col in range(40):
                 ch = m[mat + 40 * r + col]
                 for line in range(8):
-                    b = m[chars + ch * 8 + line]
+                    ad = chars + ch * 8 + line
+                    b = self.shadow[ad - 0xd000] if 0xd000 <= ad < 0xe000 else m[ad]
                     for p in range(4):
                         v = (b >> (6 - 2 * p)) & 3
                         colour = bg[v] if v < 3 else (m[0xd800 + 40 * r + col] & 7)
@@ -118,10 +139,11 @@ class Machine:
             sx = m[0xd000 + 2 * s] | (((msb >> s) & 1) << 8)
             sy = m[0xd001 + 2 * s]
             ptr = m[mat + 0x3f8 + s]
-            base = 0x8000 + ptr * 64
+            base = 0xc000 + ptr * 64
             for line in range(21):
                 for byte in range(3):
-                    b = m[base + line * 3 + byte]
+                    ad = base + line * 3 + byte
+                    b = self.shadow[ad - 0xd000] if 0xd000 <= ad < 0xe000 else m[ad]
                     for p in range(4):
                         v = (b >> (6 - 2 * p)) & 3
                         if v == 0:
@@ -142,13 +164,13 @@ def main():
         args = args[1:]
     frames = int(args[0]) if args else 100
     keys = set(args[1].split(",")) if len(args) > 1 and args[1] != "-" else set()
-    out = args[2] if len(args) > 2 else os.path.join(HERE, "..", "build", "proto", "check.png")
+    out = args[2] if len(args) > 2 else os.path.join(HERE, "..", "build", "c64", "check.png")
     mc = Machine(pal)
-    lb = labels(os.path.join(HERE, "..", "build", "proto", "proto.lbl"))
+    lb = labels(os.path.join(HERE, "..", "build", "c64", "game.lbl"))
     m = mc.cpu.m
     stats = []
     for f in range(frames):
-        mc.pressed = keys if f >= 40 else set()
+        mc.pressed = keys if f >= 60 else set()
         mc.border.clear()
         mc.run_frame()
         ev = mc.border
@@ -163,14 +185,11 @@ def main():
     g = lambda n, i=0: m[lb[n] + i]
     if stats:
         work = [w for w, r in stats]
-        red = [r for w, r in stats]
-        print("cycles of work a frame: average %d, most %d; screen matrix rebuilds: %d frames of %d, %d cycles each; one frame is %d"
-              % (sum(work) / len(work), max(work), sum(1 for r in red if r > 1000), len(stats),
-                 sum(r for r in red if r > 1000) / max(1, sum(1 for r in red if r > 1000)), mc.frame))
-    print("frames", frames, "tick", g("tick"), "pal", m[lb["c64_pal"]])
-    print("player cell", g("a_cx"), "y", g("a_y"), "frame", g("a_frame"), "air", g("a_air"), "jt", g("a_jt"))
+        print("cycles of work a frame: average %d, most %d (a frame is %d)" % (sum(work) / len(work), max(work), mc.frame))
+    print("frames", frames, "tick", g("tick"), "pal", g("c64_pal"), "level", g("level"))
+    print("player px", g("px"), "pc", g("pc"), "py", g("py"), "dir", g("pdir"), "stance", g("pstance"), "frame", g("pframe"),
+          "jt", g("jump_timer"), "jf", g("pjf"), "energy", g("suit_energy"), "overflow", g("overflow"), "nchars", g("nchars"))
     print("window", g("cur_w"), "camera", g("cur_cam"), "xscroll", m[0xd016] & 7, "matrix", hex(m[0xd018]))
-    print("enemies at cells", [g("a_cx", i) for i in (1, 2, 3)], "y", [g("a_y", i) for i in (1, 2, 3)])
     mc.render(out)
     print("wrote", out)
 

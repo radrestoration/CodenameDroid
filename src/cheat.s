@@ -1,4 +1,4 @@
-; ---- the test build (make native CHEAT=1): keys 1 - 9, 0, Q, W go to levels 1 - 12 (at the right lift), E fills the energy and the
+; ---- the test build (make CHEAT=1): keys 1 - 9, 0, Q, W go to levels 1 - 12 (at the right lift), E fills the energy and the
 ; pass cards and cells, R gives the microfilm, the key and the spanner, T the jet pack
 
 .segment "BSS"

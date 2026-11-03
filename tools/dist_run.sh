@@ -19,4 +19,4 @@ for a in "$@"; do
 done
 args=(-autostartprgmode 1)
 [ $model = ntsc ] && args+=(-model ntsc) || args+=(-model c64c)
-exec "$vice" "${args[@]}" "${extra[@]}" "droid.$ext"
+exec "$vice" "${args[@]}" "${extra[@]}" "$([ $ext = prg ] && echo game.prg || echo droid.d64)"

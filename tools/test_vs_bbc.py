@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""The native engine (native/, build/native) against the BBC game, by game state: both get the same keys at each pass of the
+"""The game (src/, build/c64) against the BBC game, by game state: both get the same keys at each pass of the
 game's main loop, and the player's state, the energies, the objects carried and the enemies' variables must agree after each.
 (Enemies do not fire in this test, as the two games' random numbers differ, and the terminal and jet pack screens are not used.)
 
-    test_native_vs_bbc.py [iterations] [seed] [deepest]      deepest: 1 shrine, 2 quarters (the BBC's debug jump)
+    test_vs_bbc.py [iterations] [seed] [deepest]      deepest: 1 shrine, 2 quarters (the BBC's debug jump)
 """
 import os
 import random
@@ -11,7 +11,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-sys.path.insert(0, os.path.join(HERE, "..", "native"))
+sys.path.insert(0, os.path.join(HERE, "..", "tools"))
 from bbcsim import BBC  # noqa: E402
 import make_tables  # noqa: E402
 import sim_check as sc  # noqa: E402
@@ -57,7 +57,7 @@ def main(iterations=300, seed=1, deepest=0):
         bbc.cpu.step()
     # the native engine in the same place
     mc = sc.Machine(True)
-    lb = sc.labels(os.path.join(HERE, "..", "build", "native", "game.lbl"))
+    lb = sc.labels(os.path.join(HERE, "..", "build", "c64", "game.lbl"))
     c = mc.cpu
     m = c.m
     for f in range(120):

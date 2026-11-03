@@ -3,8 +3,25 @@
 ; kept at $0334, which the game's file does not cover. Built by `make intro`.
 
 .setcpu "6502"
-.include "memmap.inc"
-.include "zp.inc"
+; the loading screens' own variables: the zero page and low memory (the game is not loaded yet)
+zp_p1       = $d0           ; 2
+zp_ci       = $d2           ; 2
+zp_h        = $d5
+zp_t        = $d7
+zp_u        = $d8           ; 2
+zp_d        = $f1           ; 2
+zp_idx      = $f3           ; 2
+zp_v        = $f5           ; 2
+c64_pal     = $0205         ; 1 = PAL (50 Hz), 0 = NTSC (60 Hz)
+kb_rows     = $0230         ; 8: the keyboard matrix rows read for each column (0 bits = pressed)
+kb_new      = $0238         ; 12: codes pressed in this scan, kb_nnew of them
+kb_held     = $0244         ; 4: held game keys, oldest first
+kb_nheld    = $0248
+kb_nnew     = $0249
+kb_ascii    = $024a         ; ASCII of the first key newly pressed in the last scan (0 = none)
+kb_joy      = $024b
+kb_tmp      = $024c
+kb_prev     = $0280         ; 9: the keyboard rows and joystick as the last scan with a change saw them
 os_most_recently_pressed_key = $ec
 os_first_pressed_key         = $ed
 

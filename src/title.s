@@ -1,4 +1,4 @@
-; ---- the title screen: the BBC's own, as characters (made by tools/make_native_data.py from the BBC game run to its title loop),
+; ---- the title screen: the BBC's own, as characters (made by tools/make_data.py from the BBC game run to its title loop),
 ; with the player walking on the spot and firing now and then, the tune, and the keys: SPACE to start, J to jump to the saved
 ; place, F1 and F3 for the sound.
 

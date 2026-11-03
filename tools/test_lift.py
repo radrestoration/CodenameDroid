@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """Exercise the visible lift ride and the next-level display handoff.
-Run after `make native`: test_native_lift.py.
+Run after `make`: test_lift.py.
 """
 import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "native"))
+sys.path.insert(0, os.path.join(HERE, "..", "tools"))
 from sim_check import Machine, labels  # noqa: E402
 
 
 def main():
     mc = Machine(True)
     c, m = mc.cpu, mc.cpu.m
-    sym = labels(os.path.join(HERE, "..", "build", "native", "game.lbl"))
+    sym = labels(os.path.join(HERE, "..", "build", "c64", "game.lbl"))
     for _ in range(120):
         mc.run_frame()
 

@@ -1,4 +1,4 @@
-# Codename Droid, C64 port; see README.md and C64-README.md. The BBC game it runs is in bbc/ (built into build/bbc by `make -C bbc`).
+# Codename Droid for the C64; see README.md. The BBC game whose rules and data it follows is in bbc/ (built into build/bbc by `make -C bbc`).
 -include tools.cfg
 tilde = $(patsubst ~%,$(HOME)%,$(1))
 ifneq ($(strip $(CC65_HOME)),)
@@ -14,119 +14,62 @@ C1541      ?= c1541
 override CA65 := $(call tilde,$(CA65))
 override LD65 := $(call tilde,$(LD65))
 
-# the game's window is WIDE cells wide: 40 (the default), or the BBC's 32 (the same build directory)
-WIDE ?= 40
-export WIDE
-B   ?= build/c64
-# make CHEAT=1: a test build (its own directory) in which the player cannot die
-ifdef CHEAT
-B      := build/cheat
-AFLAGS += -DCHEAT
-endif
+# make CHEAT=1: a test build (its own directory): the player cannot die, and level and item keys (see run.sh)
+# make PROFILE=1: border-colour timing bars
+PROFILE ?=
+CHEAT ?=
+B   ?= build/c64$(if $(PROFILE),-profile)$(if $(CHEAT),-cheat)
 BBC := build/bbc
-GEN := $(B)/gen
+GEN := build/c64/gen
 SRC := $(wildcard src/*.s src/*.inc)
-
-.PHONY: all gen levels test help clean FORCE zip proto
-all: $(B)/droid.prg
-
-help:
-	@echo "make              build/c64/droid.prg (and droid.d64), the game's window 40 cells wide"
-	@echo "make WIDE=32      the same with the BBC's 32-cell window (into the same directory)"
-	@echo "make test         the checks in the headless 6502 simulator (make test WIDE=32 for the 32-cell build's)"
-	@echo "make levels       render the 12 levels to build/c64/levels/*.png"
-	@echo "make zip         build/c64/codename-droid-c64.zip: the PRG, the disk image, a VICE run script and README.md"
-	@echo "make native       the native engine (native/README.md): build/native/game.prg and game.d64; CHEAT=1, PROFILE=1; native/run.sh"
-	@echo "make clean        remove build/c64 (build/bbc is the BBC game's: make -C bbc clean)"
-
-# the BBC game rebuilt first (its disc.lbl and CDroid4 are what the tools read)
-$(BBC)/CDroid4 $(BBC)/disc.lbl:
-	$(MAKE) -C bbc
-
-# switching WIDE rebuilds everything: the width is recorded in a stamp that changes only when it does
-$(B)/wide: FORCE
-	@mkdir -p $(B)
-	@echo $(WIDE) | cmp -s - $@ || echo $(WIDE) > $@
-
-FORCE:
-
-$(GEN)/game.s: $(B)/wide tools/make_game_source.py tools/make_tables.py tools/make_sound_tables.py tools/bbcmem.py tools/wide_patches.py tools/wide_sites.py bbc/src/droid.s bbc/src/data.s bbc/src/symbols.inc $(BBC)/CDroid4
-	$(PYTHON) -I tools/make_game_source.py $(GEN)
 
 # the loading screens come from the original disc (without it: no loading screens)
 DISC   ?= $(HOME)/retro/games/Disc032-CodenameDroidStrykersRun2.ssd
 DISC   := $(call tilde,$(DISC))
 export DISC
 
-$(GEN)/intro_data.s: tools/make_intro.py tools/mode7.py tools/make_title_map.py tools/detok.py $(wildcard $(DISC)) $(B)/wide
+.PHONY: all test help clean zip
+all: $(B)/game.prg
+
+help:
+	@echo "make              build/c64/game.prg and game.d64 (and droid.d64 with the loading screens, if the original disc is found)"
+	@echo "make CHEAT=1      the test build in build/c64-cheat; PROFILE=1: with timing bars"
+	@echo "make test         the headless checks (6502 simulator, no emulator)"
+	@echo "make zip          build/c64/codename-droid-c64.zip: the disk image, the PRG, a VICE run script and README.md"
+	@echo "make clean        remove build/c64* (build/bbc is the BBC game's: make -C bbc clean)"
+
+# the BBC game rebuilt first (its disc.lbl and CDroid4 are what the data tools read)
+$(BBC)/CDroid4 $(BBC)/disc.lbl:
+	$(MAKE) -C bbc
+
+$(B)/game_data.inc: tools/make_data.py tools/bbcmem.py tools/make_tables.py tools/make_sound_tables.py tools/make_title_map.py tools/bbcsim.py tools/sim6502.py $(BBC)/CDroid4
+	$(PYTHON) -I tools/make_data.py $(B)
+
+$(B)/game.o: $(SRC) $(B)/game_data.inc
+	$(CA65) -g $(if $(PROFILE),-DPROFILE) $(if $(CHEAT),-DCHEAT) -I $(B) -I src src/game.s -o $@ -l $(B)/game.lst
+
+$(B)/game.prg: $(B)/game.o c64.cfg
+	$(LD65) -C c64.cfg $< -o $@ -Ln $(B)/game.lbl -m $(B)/game.map
+	$(C1541) -format "droid,01" d64 $(B)/game.d64 -write $@ game >/dev/null
+	@if [ -n "$(wildcard $(DISC))" ]; then $(MAKE) -s $(B)/intro.prg && \
+	  $(C1541) -format "droid,01" d64 $(B)/droid.d64 -write $(B)/intro.prg droid -write $@ game >/dev/null; fi
+
+# the loading screens, a program of their own that loads the game (intro/)
+$(GEN)/intro_data.s: tools/make_intro.py tools/mode7.py tools/make_title_map.py tools/detok.py $(wildcard $(DISC))
 	@mkdir -p $(GEN)
 	$(PYTHON) -I tools/make_intro.py $@
 
-$(B)/c64.o: $(SRC) $(GEN)/game.s $(GEN)/intro_data.s
-	$(CA65) -g $(AFLAGS) -I src -I $(GEN) src/c64.s -o $@ -l $(B)/c64.lst
+$(B)/intro.prg: intro/intro_main.s intro/intro.cfg src/intro.s $(GEN)/intro_data.s
+	$(CA65) -g -I src -I intro -I $(GEN) intro/intro_main.s -o $(B)/intro.o -l $(B)/intro.lst
+	$(LD65) -C intro/intro.cfg $(B)/intro.o -o $@ -m $(B)/intro.map
 
-# the PRG area: from $0801 to wherever the engine, tables, sound driver and loading screens end (the file is not padded);
-# the file must end below $d000 (the loading screens' screen RAM is under the I/O area there)
-PRGSIZE ?= $$c7ff
-CFG := c64_$(WIDE).cfg
-
-$(B)/c64.cfg: $(CFG) Makefile $(B)/wide
-	sed 's/size = \$$8a00,/size = $(PRGSIZE),/' $(CFG) > $@
-
-$(B)/droid.prg: $(B)/c64.o $(B)/c64.cfg
-	$(LD65) -C $(B)/c64.cfg -m $(B)/c64.map -Ln $(B)/c64.lbl -o $@ $(B)/c64.o
-	$(PYTHON) -I tools/check_map.py $(B)/c64.map
-	$(C1541) -format "droid,01" d64 $(B)/droid.d64 -write $@ droid >/dev/null
-
-levels: $(BBC)/CDroid4
-	$(PYTHON) -I tools/extract_levels.py $(B)/levels
-
-test: $(B)/droid.prg
+test: $(B)/game.prg
 	bash tools/run_tests.sh
 
-ZIP := $(B)/codename-droid-c64$(if $(filter 32,$(WIDE)),-narrow).zip
+ZIP := $(B)/codename-droid-c64.zip
 
-zip: $(B)/droid.prg tools/make_zip.py tools/dist_run.sh README.md
+zip: $(B)/game.prg tools/make_zip.py tools/dist_run.sh README.md
 	$(PYTHON) -I tools/make_zip.py $(B) $(ZIP)
 
 clean:
-	rm -rf $(B)
-
-# the C64-native engine prototype (proto/): `make proto` builds build/proto/proto.prg, `proto/run.sh` runs it in VICE
-PROTO ?= build/proto
-PROTO_LEVEL ?= 1
-proto: $(PROTO)/proto.prg
-
-$(PROTO)/rows.bin: proto/make_proto_data.py tools/bbcmem.py $(BBC)/CDroid4
-	$(PYTHON) -I proto/make_proto_data.py $(PROTO) $(PROTO_LEVEL)
-
-$(PROTO)/proto.o: proto/proto.s $(PROTO)/rows.bin
-	$(CA65) -g -I $(PROTO) --bin-include-dir $(PROTO) proto/proto.s -o $@ -l $(PROTO)/proto.lst
-
-$(PROTO)/proto.prg: $(PROTO)/proto.o proto/proto.cfg
-	$(LD65) -C proto/proto.cfg $< -o $@ -Ln $(PROTO)/proto.lbl -m $(PROTO)/proto.map
-
-# the C64-native game (native/): `make native` builds build/native/game.prg
-PROFILE ?=
-CHEAT ?=
-NATIVE ?= build/native$(if $(PROFILE),-profile)$(if $(CHEAT),-cheat)
-
-.PHONY: native
-native: $(NATIVE)/game.prg
-
-$(NATIVE)/native_data.inc: tools/make_native_data.py tools/bbcmem.py tools/make_tables.py $(BBC)/CDroid4
-	$(PYTHON) -I tools/make_native_data.py $(NATIVE)
-
-$(NATIVE)/game.o: native/game.s native/*.s native/state.inc src/sound.s $(NATIVE)/native_data.inc
-	$(CA65) -g $(if $(PROFILE),-DPROFILE) $(if $(CHEAT),-DCHEAT) -I $(NATIVE) -I native -I src native/game.s -o $@ -l $(NATIVE)/game.lst
-
-$(NATIVE)/game.prg: $(NATIVE)/game.o native/game.cfg
-	$(LD65) -C native/game.cfg $< -o $@ -Ln $(NATIVE)/game.lbl -m $(NATIVE)/game.map
-	$(C1541) -format "droid,01" d64 $(NATIVE)/game.d64 -write $@ game >/dev/null
-	@if [ -n "$(wildcard $(DISC))" ]; then $(MAKE) -s $(NATIVE)/intro.prg && \
-	  $(C1541) -format "droid,01" d64 $(NATIVE)/droid.d64 -write $(NATIVE)/intro.prg droid -write $@ game >/dev/null; fi
-
-# the loading screens, a program of their own that loads the game (intro/): build/native/intro.prg, and droid.d64 with both
-$(NATIVE)/intro.prg: intro/intro_main.s intro/intro.cfg src/intro.s $(GEN)/intro_data.s
-	$(CA65) -g -I src -I intro -I $(GEN) intro/intro_main.s -o $(NATIVE)/intro.o -l $(NATIVE)/intro.lst
-	$(LD65) -C intro/intro.cfg $(NATIVE)/intro.o -o $@ -m $(NATIVE)/intro.map
+	rm -rf build/c64 build/c64-cheat build/c64-profile

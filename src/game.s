@@ -1,10 +1,10 @@
-; Codename Droid, C64-native engine: the BBC game's rules on a character-mode display with smooth scrolling.
+; Codename Droid, C64 version: the BBC game's rules on a character-mode display with smooth scrolling.
 ; The level is a window onto ROWS (32 rows of 256 character numbers) made at level load from the BBC's own tiles; the player is
 ; hardware sprites; enemies, objects and mines are characters written into ROWS (and the two screen matrices) as they change; the
 ; blasters are sprites. The rules are the BBC game's (bbc/src/droid.s), ported routine by routine; the names follow it.
 
 .setcpu "6502"
-.include "native_data.inc"
+.include "game_data.inc"
 
 ; ---- memory
 BPAT        = $ee00             ; the BBC bytes of each character: line n of character c at BPAT + n * 256 + c
