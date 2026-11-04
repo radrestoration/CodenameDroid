@@ -1094,6 +1094,13 @@ game_over:
     jsr play_sound_for_damage
     lda #100
     jsr wait_frames
+    lda #0                      ; no sprites over the box
+    sta p_en
+    sta p_msb
+    lda #1
+    sta ready
+@sp: lda ready
+    bne @sp
     lda t_w
     clc
     adc #4

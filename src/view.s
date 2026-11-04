@@ -87,7 +87,21 @@ draw_full:
 init_view:
     lda level
     jsr start_for_level          ; px, py for the level's start (sets the player)
+    lda py                       ; the camera as the follow rule leaves it for that line: the top of the level (the ship) unless the player is low
+    lsr
+    lsr
+    lsr
+    cmp #19
+    bcc @top
+    sec
+    sbc #12
+    cmp #8
+    bcc @cam
     lda #7
+    bne @cam
+@top:
+    lda #0
+@cam:
     sta cur_cam
     sta want_cam
     jsr snap_player

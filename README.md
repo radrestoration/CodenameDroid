@@ -90,7 +90,7 @@ You need cc65 (`ca65`, `ld65`), Python 3 with numpy and Pillow, and `c1541` (par
 screens. The build itself needs nothing from a BBC ROM.
 
     make            build/c64/game.prg, game.d64 and (with the disc) droid.d64 (builds the BBC game into build/bbc first)
-    make CHEAT=1    the test build in build/c64-cheat: keys 1-9, 0, Q, W go to levels 1-12 (at the right lift), E fills energy, pass
+    make CHEAT=1    the test build in build/c64-cheat: keys 1-9, 0, Q, W go to levels 1-12 (at the lift the player arrives by), E fills energy, pass
                     cards and cells, R gives the microfilm, the key and the spanner, T the jet pack; the player cannot die
     make PROFILE=1  the border shows the time: blue the game, red the screen matrix
     make zip        build/c64/codename-droid-c64.zip: the PRG, the disk image, run.sh and this file

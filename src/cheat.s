@@ -1,4 +1,4 @@
-; ---- the test build (make CHEAT=1): keys 1 - 9, 0, Q, W go to levels 1 - 12 (at the right lift), E fills the energy and the
+; ---- the test build (make CHEAT=1): keys 1 - 9, 0, Q, W go to levels 1 - 12 (at the lift the player arrives by), E fills the energy and the
 ; pass cards and cells, R gives the microfilm, the key and the spanner, T the jet pack
 
 .segment "BSS"
@@ -23,6 +23,10 @@ cheat_tab:
     .byte $fb, $02, $f1         ; R
     .byte $fb, $40, $f2         ; T
 CHEATS = 15
+
+; the side of the level the lift from the level before arrives at ($f8 the right, 0 the left): where its chain is
+cheat_side:
+    .byte $f8, $f8, 0, $f8, $f8, $f8, 0, $f8, $f8, $f8, 0, 0
 
 cheat_keys:
     ldx #0
@@ -53,7 +57,8 @@ cheat_keys:
     bcs @action
     ; a level
     pha
-    lda #$f8
+    tax
+    lda cheat_side,x
     sta init_px
     lda #0
     sta arrive_mode

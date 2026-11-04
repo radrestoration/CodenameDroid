@@ -152,7 +152,9 @@ start_for_level:
     sta pc
     lda #0
     sta pdir
-    jmp @y
+    lda #128                    ; standing on the ground under the ship
+    sta py
+    rts
 :   lda init_px
     bmi @right
     lda #4

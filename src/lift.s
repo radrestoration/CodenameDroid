@@ -514,7 +514,7 @@ lift_finish_view:
 
     lda level
     jsr start_for_level
-    lda #7
+    lda rcam                    ; the ride ends on the rows it was showing: the camera stays
     sta cur_cam
     sta want_cam
     jsr snap_player
