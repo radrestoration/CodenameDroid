@@ -28,11 +28,12 @@ https://bbcmicro.co.uk/game.php?id=564
 
 ## Download
 
-`make zip` builds the release zip (see Building).
+`make zip` builds the release zip (see Building). Published releases are available on
+[GitHub Releases](https://github.com/radrestoration/CodenameDroid/releases).
 
 ## Commodore 64 Port Notes
 
-The game aims to be a faithful port of the original, but there are some consessions:
+The game aims to be a faithful port of the original, but there are some concessions:
 
  - The original BBC Micro game ran in Mode 5, which is 256 pixels vertically with a reduced width of 256 (actually, 128,
    because the pixels are rectangular). The Commodore 64 version instead uses a play area of 320 (160 pixels) x 200 to give
@@ -92,7 +93,7 @@ You need cc65 (`ca65`, `ld65`), Python 3 with numpy and Pillow, and `c1541` (par
 (`Disc032-CodenameDroidStrykersRun2.ssd`, set `DISC` if it is not in `~/retro/games`); without it the build has no loading
 screens. The build itself needs nothing from a BBC ROM.
 
-    make            build/c64/game.prg, game.d64 and (with the disc) droid.d64 (builds the BBC game into build/bbc first)
+    make            build/c64/game.prg and (with the original disc) droid.d64 containing the intro and game
     make CHEAT=1    the test build in build/c64-cheat: keys 1-9, 0, Q, W go to levels 1-12 (at the lift the player arrives by), E fills energy, pass
                     cards and cells, R gives the microfilm, the key and the spanner, T the jet pack; the player cannot die
     make PROFILE=1  the border shows the time: blue the game, red the screen matrix
@@ -100,13 +101,28 @@ screens. The build itself needs nothing from a BBC ROM.
     make test       the headless checks in the 6502 simulator (no emulator)
     make help
 
+The disk image and release zip require the original BBC disc image; without it, `make` builds the standalone game PRG only.
+
+## Releasing
+
+Release builds also require `zip`, `sha256sum` and Git. Commit all changes first, and add release notes under a
+`## vX.Y.Z` heading in `CHANGELOG.md`.
+
+    make release                    versioned zip and SHA256SUMS in build/release/
+    make publish TAG=v1.0.0 DRY=1   check the release notes and show what would happen
+    make publish TAG=v1.0.0         build, tag, push to origin and create a GitHub release
+
+Publishing requires `gh` authenticated for this repository. Tags containing a hyphen create prereleases.
+The release zip includes `VERSION.txt` with the version, commit and build time. A full play-through and the
+intro-to-game loading sequence are still outstanding checks before publication.
+
 ## How the game works
 
 Keys are as in the controls table above.
 
 - **The level** (`src/level.s`): at level load the BBC's tiles (4 x 4 cells, from the BBC game's own tile art, flips and all)
-  are made into characters, each distinct 8-byte cell once (`intern`: hashed, compared), at most 203 a level (the largest
-  needs 179). The level is `ROWS`, 32 rows of 256 character numbers, and `BPAT`, each character's BBC bytes, which the
+  are made into characters, each distinct 8-byte cell once (`intern`: hashed, compared), at most 203 a level.
+  The level is `ROWS`, 32 rows of 256 character numbers, and `BPAT`, each character's BBC bytes, which the
   rules read as the BBC reads its screen. The map of tiles (`LTILES`, a page a level) is the BBC's, edited by the game's
   events (lifts, pillars, doors...).
 - **The display** (`view.s`): a window of 40 x 25 cells onto `ROWS`, in two screen matrices (`$c800`, `$cc00`), one shown
@@ -143,6 +159,8 @@ tables, `$fa00` the sound driver's variables; `$0200` variables.
 `tools/sim_check.py` runs it headless (6502 simulator, a model of the raster, keys and interrupts) and renders the screen.
 `tools/test_enemy_pool.py` checks the new-game start and character-group capacity on the two crowded early levels.
 `tools/test_lift.py` exercises the ride, next-level rebuild, and charset/sprite display handoff in the raster simulator.
+`tools/test_intro_loader.py` checks the intro loader's successful and failed KERNAL calls with a headless model; it does not
+test a real disk drive.
 `tools/test_vs_bbc.py [iterations] [seed] [deepest]` runs it against the BBC game with the same keys: after each pass
 of the main loop the player's state, the energies, the objects carried and the enemies' variables must agree. They do, for
 hundreds to thousands of iterations on levels 0, 3 and 6, with random play; where they differ the BBC's own pixels are the
@@ -154,7 +172,9 @@ level). The collisions with enemy fire, mines and the terminal are not in that t
 - The picture scrolls smoothly; the player, the enemies and the rules move a cell at a time as on the BBC, the bullets smoothly.
 - The screen shows 25 of the level's 32 rows (the camera), and 40 of its columns instead of 32.
 - Sprites do not overwrite the background, so a player or an enemy in front of a rope or a chain leaves it showing.
-- The title does not scroll in. The instruction pages, the pictures and the credits (the BBC disc's front end, `src/intro.s`) are a program of their own, `intro/` -> `build/c64/intro.prg`: it shows them, then loads `GAME` over itself and runs it (`droid.d64` has both; `game.prg` alone starts at the title). Not run on a C64 or in VICE: the sim reaches its KERNAL LOAD call.
+- The title does not scroll in. The instruction pages, pictures and credits (`src/intro.s`) are a separate program,
+  `intro/` -> `build/c64/intro.prg`: it loads `GAME` over itself (`droid.d64` has both; `game.prg` starts at the title).
+  The intro-to-game disk loading sequence has not yet been verified end to end.
 - A lift ride (`lift.s`) scrolls the 40 columns at the lift's end of the old and new levels past the fixed cabin and player.
   The new level is built into separate row/charset storage while the ride remains visible, then the display switches to the
   rebuilt level at landing without the former black rebuild.

@@ -10,8 +10,7 @@ screen cells to ring cells instead of as the ring is:
   - 8 rows shorter: two square rows of the frame are left out, so that the whole of it fits the screen's 24 rows;
   - the middle is re-arranged to fit: SUPERIOR and PRESENTS on one line, blank rows taken out, the music icon moved right so
     that HIT SPACE has the bottom row, and a gap between the player and HIT SPACE.
-The map is a list of segments (a run of cells of one ring row to a run of cells of one screen row) in screen order, for the C64's
-code to copy the picture from (src/cells.s, title_remap).
+The map is a list of segments (a run of cells of one ring row to a run of cells of one screen row) in screen order.
    make_title_map.py   prints the layout
 """
 import sys

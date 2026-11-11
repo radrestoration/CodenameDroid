@@ -214,7 +214,7 @@ def main(iterations=300, seed=1, deepest=0):
         call("game_step")
         if os.environ.get("DEBUG_WATCH") == str(i):
             c.write_hooks.pop()
-        call("smooth")
+        call("snap_player")
         call("calc_scroll")
         # compare
         diffs = []

@@ -203,8 +203,7 @@ col_ptr:
     sta p4 + 1
     rts
 
-; smooth: the picture is where the game put the player, always. The game takes several steps in a frame when the machine is slow (and a step is a whole cell, or four lines of a fall): a picture that glides toward the player trails it, and at a ledge's corner it is drawn over the rock the game has already cleared
-smooth:
+; Keep the picture at the logic position, even when several game steps run in one frame.
 snap_player:
     lda px
     lsr

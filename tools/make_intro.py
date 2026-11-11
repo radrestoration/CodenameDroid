@@ -11,14 +11,12 @@ BASIC program CDroid, in MODE 1 (320 x 256, four colours):
 and text in capitals the program redefines (VDU 23 in its listing); its digits and punctuation are the OS's, which are
 not here: the C64's own character ROM supplies them when the page is shown.
 
-On the C64 the pictures are multicolour bitmaps, 160 x 200: the 320 x 256 screen is scaled (area average, then
-Floyd-Steinberg to the three colours and black) so that nothing is cropped; the three colours are the same in every cell
-(screen RAM holds two, colour RAM the third), so only the 8000 bitmap bytes are stored, compressed (LZ77, see
-compress()). The logo and the strip keep their rows and halve their width without dithering (halve()). The strip is made into multicolour characters; the credits text is the redefined capitals in a hires
-character set, the same screen showing both (colour RAM bit 3).
+On the C64 the pictures are multicolour bitmaps, 160 pixels wide; the full screen picture scrolls vertically to show all
+256 rows. The logo and the strip keep their rows and halve their width without dithering (halve()). The bitmap bytes are
+compressed (LZ77, see compress()). The strip is made into multicolour characters; the credits text is the redefined
+capitals in a hires character set, the same screen showing both (colour RAM bit 3).
 
-Input: the disc image (DISC), found by the Makefile. Without it an intro_data.s with INTRO_PRESENT = 0 is written and the
-build has no loading screens.
+Input: the disc image (DISC), found by the Makefile. The Makefile requires it to build the loading screens.
 """
 import os
 import sys
@@ -44,29 +42,6 @@ def mode1(data):
                 for p in range(4):
                     img[cy * 8 + ln, cx * 4 + p] = ((b >> (7 - p)) & 1) << 1 | ((b >> (3 - p)) & 1)
     return img
-
-
-def quantise(a, pal):
-    """Floyd-Steinberg of the float image a (H x W x 3) to the palette (4 x 3): indices."""
-    import numpy as np
-    h, w, _ = a.shape
-    a = a.copy()
-    out = np.zeros((h, w), np.uint8)
-    for y in range(h):
-        for x in range(w):
-            old = a[y, x]
-            k = int(np.argmin(((pal - old) ** 2).sum(1)))
-            out[y, x] = k
-            err = old - pal[k]
-            if x + 1 < w:
-                a[y, x + 1] += err * 7 / 16
-            if y + 1 < h:
-                if x > 0:
-                    a[y + 1, x - 1] += err * 3 / 16
-                a[y + 1, x] += err * 5 / 16
-                if x + 1 < w:
-                    a[y + 1, x + 1] += err / 16
-    return out
 
 
 def halve(img):
@@ -138,19 +113,6 @@ def scroll_picture(data, pal):
     bm = to_mc(halve(img))
     assert len(bm) == 32 * 320
     return bm[:8000], bm[8000:] + bytes(320)
-
-
-def picture(data, pal):
-    """A MODE 1 screen (320 x up to 256) as 160 x 200 C64 multicolour bitmap bytes: scaled to 200 rows (the logo has its
-    own, logo_picture())."""
-    import numpy as np
-    from PIL import Image
-    img = mode1(data)
-    rgb = np.array([BBC[p] for p in pal], float)
-    full = np.zeros((256, 320), np.uint8)
-    full[:img.shape[0]] = img
-    small = np.asarray(Image.fromarray(rgb[full].astype(np.uint8)).resize((160, 200), Image.BOX), float)
-    return to_mc(quantise(small, rgb))
 
 
 def compress(data):
@@ -436,15 +398,11 @@ def main(out):
         charset[code[k] * 8:code[k] * 8 + 8] = p
     logo_bm, logo_scr = logo_picture(files["CDroid1"], (0, 1, 4, 7))
     img1, img1s = compress(logo_bm), compress(logo_scr)
-    scroll = os.environ.get("WIDE") != "32"                # (the 32-cell layout has no room to scroll in: bank 1 holds the tiles)
-    if scroll:
-        top, extra = scroll_picture(files["CDroid2"], (0, 1, 6, 7))
-        img2, img2x = compress(top), compress(extra)
-    else:
-        img2, img2x = compress(picture(files["CDroid2"], (0, 1, 6, 7))), b""
+    top, extra = scroll_picture(files["CDroid2"], (0, 1, 6, 7))
+    img2, img2x = compress(top), compress(extra)
     chars = compress(bytes(charset))
     raws = []
-    for page in (mode7.run(front) if os.environ.get("WIDE") != "32" else []):      # (the 32-cell layout has no room: its PRG is longer)
+    for page in mode7.run(front):
         raw = bytearray()
         for y, x, colour, text in mode7.c64_page(page):
             raw += bytes([y, x, colour]) + text + b"\0"
@@ -468,7 +426,7 @@ def main(out):
         f.write("INTRO_PG_CREDITS = %d\nINTRO_PG_KEYS = %d\nINTRO_PG_TERMINAL = %d\n" % (n7, n7 + 1, n7 + 2))
         f.write("INTRO_COLOURS2 = $%02x          ; picture 2: red, cyan\n" % (C64_RED << 4 | C64_CYAN))
         f.write("INTRO_M7_PAGES = %d\n" % n7)
-        gap = (0x8000 - 0x6600) if (scroll and os.environ.get("WIDE") != "32") else 0      # (the 40-column layout's gap below the tiles)
+        gap = 0x8000 - 0x6600
         room = gap - len(img1s) - len(img2x or b"\0") - len(img1)
         in_gap = room >= 0                                # the logo's picture too, if the gap has room for it
         if not in_gap:
@@ -478,17 +436,16 @@ def main(out):
                 + ("intro_img1:\n" + bytes_lines(img1) if in_gap else "")
                 + "intro_img1s:                    ; the logo's screen RAM\n" + bytes_lines(img1s)
                 + "intro_img2x:                    ; (the scroll's other rows)\n" + bytes_lines(img2x or b"\0") + '\n.segment "INTRO"\n\n')
-        f.write("INTRO_SCROLL = %d\n" % (1 if scroll else 0))
-        f.write("INTRO_TMAP = %d                  ; the title screen's map (tools/make_title_map.py) is here\n" % (1 if scroll else 0))
+        f.write("INTRO_SCROLL = 1\n")
+        f.write("INTRO_TMAP = 1                  ; the title screen's map (tools/make_title_map.py) is here\n")
         f.write("INTRO_SPLIT_LINE = %d             ; the raster line where the logo screen goes from multicolour to hires\n" % (51 + 8 * SPLIT_ROW))
         f.write("intro_charset_c:                ; 256 characters (the redefined capitals by ASCII code, the strip's in the rest), packed\n"
                 + bytes_lines(chars))
         f.write("intro_strip_c:                  ; 40 x 5 character codes, packed (200 bytes)\n" + bytes_lines(compress(bytes(code[c] for c in cells)), 40))
-        if scroll:
-            import make_title_map
-            tseg = make_title_map.tables()
-            f.write('\n.segment "INTRO"                 ; (not in the gap: the scroll uses that as a bitmap before the map is unpacked)\n\n')
-            f.write("INTRO_TMAP_SIZE = %d\nintro_tmap_c:\n" % len(tseg) + bytes_lines(compress(tseg)))
+        import make_title_map
+        tseg = make_title_map.tables()
+        f.write('\n.segment "INTRO"                 ; (not in the gap: the scroll uses that as a bitmap before the map is unpacked)\n\n')
+        f.write("INTRO_TMAP_SIZE = %d\nintro_tmap_c:\n" % len(tseg) + bytes_lines(compress(tseg)))
         f.write('\n.segment "INTRO"\n\nintro_hf_count:                  ; the Huffman code of the pages: how many codes there are of each length 1-15,\n'
                 + bytes_lines(bytes(hf_count)) + "intro_hf_syms:                   ; and the symbols in code order\n" + bytes_lines(bytes(hf_syms)))
         seg = None

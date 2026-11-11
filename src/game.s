@@ -431,7 +431,7 @@ compute_frame:
     jsr game_step
     jmp @steps
 @nostep:
-    jsr smooth
+    jsr snap_player
     jsr calc_scroll
     BORDER 2
     jsr matrix_update
