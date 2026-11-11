@@ -19,4 +19,7 @@ for a in "$@"; do
 done
 args=(-autostartprgmode 1)
 [ $model = ntsc ] && args+=(-model ntsc) || args+=(-model c64c)
+if [ "$ext" = d64 ]; then
+  args+=(-virtualdev8 +drive8truedrive +autostart-handle-tde)
+fi
 exec "$vice" "${args[@]}" "${extra[@]}" "$([ $ext = prg ] && echo game.prg || echo droid.d64)"

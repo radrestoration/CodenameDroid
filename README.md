@@ -50,10 +50,13 @@ The player and the bullets are C64 hardware sprites; everything else is rendered
 
 ## Running the C64 version
 
-With VICE (`x64sc`): `./run.sh` (PAL), `./run.sh ntsc`, `./run.sh d64` (from the disk image), `./run.sh warp`. `./run.sh cheat` is the test build. In the
+With VICE (`x64sc`): `./run.sh` (PAL), `./run.sh ntsc`, `./run.sh intro` (from the disk image), `./run.sh warp`. `./run.sh cheat` is the test build. In the
 release zip that is the `run.sh` beside `game.prg` and `droid.d64`; in the source tree `./run.sh` builds first. Or load
 `droid.d64` yourself (`LOAD"DROID",8,1`, `RUN`; it loads the game after the loading screens), or `game.prg` (it starts at the
 title). The program detects PAL and NTSC itself.
+
+In the source tree, `intro` autostarts the loading-screen program and attaches the disk as VICE's virtual device 8
+for the subsequent game load. The release zip uses `./run.sh d64` for the disk instead.
 
 It starts as the BBC disc does:
 1. the instruction pages from the tape inlay (SPACE for each; RUN/STOP skips them),

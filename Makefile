@@ -29,7 +29,7 @@ DISC   := $(call tilde,$(DISC))
 export DISC
 
 .PHONY: all test help clean zip
-all: $(B)/game.prg
+all: $(B)/game.prg $(if $(wildcard $(DISC)),$(B)/droid.d64)
 
 help:
 	@echo "make              build/c64/game.prg and game.d64 (and droid.d64 with the loading screens, if the original disc is found)"
@@ -51,8 +51,6 @@ $(B)/game.o: $(SRC) $(B)/game_data.inc
 $(B)/game.prg: $(B)/game.o c64.cfg
 	$(LD65) -C c64.cfg $< -o $@ -Ln $(B)/game.lbl -m $(B)/game.map
 	$(C1541) -format "droid,01" d64 $(B)/game.d64 -write $@ game >/dev/null
-	@if [ -n "$(wildcard $(DISC))" ]; then $(MAKE) -s $(B)/intro.prg && \
-	  $(C1541) -format "droid,01" d64 $(B)/droid.d64 -write $(B)/intro.prg droid -write $@ game >/dev/null; fi
 
 # the loading screens, a program of their own that loads the game (intro/)
 $(GEN)/intro_data.s: tools/make_intro.py tools/mode7.py tools/make_title_map.py tools/detok.py $(wildcard $(DISC))
@@ -61,10 +59,14 @@ $(GEN)/intro_data.s: tools/make_intro.py tools/mode7.py tools/make_title_map.py 
 
 $(B)/intro.prg: intro/intro_main.s intro/intro.cfg src/intro.s $(GEN)/intro_data.s
 	$(CA65) -g -I src -I intro -I $(GEN) intro/intro_main.s -o $(B)/intro.o -l $(B)/intro.lst
-	$(LD65) -C intro/intro.cfg $(B)/intro.o -o $@ -m $(B)/intro.map
+	$(LD65) -C intro/intro.cfg $(B)/intro.o -o $@ -m $(B)/intro.map -Ln $(B)/intro.lbl
+
+$(B)/droid.d64: $(B)/intro.prg $(B)/game.prg
+	$(C1541) -format "droid,01" d64 $@ -write $(B)/intro.prg droid -write $(B)/game.prg game >/dev/null
 
 test: $(B)/game.prg
 	bash tools/run_tests.sh
+	$(if $(wildcard $(DISC)),$(MAKE) -s $(B)/intro.prg && $(PYTHON) -I tools/test_intro_loader.py $(B),@echo "Skipping intro loader test: original disc image not found")
 
 ZIP := $(B)/codename-droid-c64.zip
 

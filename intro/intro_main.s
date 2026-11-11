@@ -43,6 +43,13 @@ start:
     inx
     bne :-
     lda $ba
+    cmp #8
+    bcc @default_device
+    cmp #12
+    bcc @save_device
+@default_device:
+    lda #8                      ; a PRG autostart may not have a disk device in $ba
+@save_device:
     sta loader_src              ; (its first byte: the device the loading screens came from)
     lda #$35
     sta $01
@@ -98,10 +105,41 @@ loader_src:
     jsr $ffba                   ; SETLFS
     lda #0
     jsr $ffd5                   ; LOAD
+    bcs loader_error
     jmp $0810
 loader_name:
     .byte "GAME"
+loader_error:
+    and #$0f
+    ora #$30
+    sta $0400 + 24
+    lda $dd00
+    ora #3
+    sta $dd00                   ; VIC bank 0, screen at $0400
+    lda #$14
+    sta $d018
+    lda #$c8
+    sta $d016
+    lda #$1b
+    sta $d011
+    lda #0
+    sta $d021
+    ldx #23
+@message:
+    lda loader_error_text - loader_src + $0334,x
+    sta $0400,x
+    lda #1
+    sta $d800,x
+    dex
+    bpl @message
+    lda #1
+    sta $d800 + 24
+@stop:
+    jmp $0334 + (@stop - loader_src)
+loader_error_text:
+    .byte 12,15,1,4,32,7,1,13,5,32,6,1,9,12,5,4,32,5,18,18,15,18,32,32
 loader_end:
+    .assert loader_end - loader_src <= 128, error, "relocated loader exceeds copy loop"
 
 KEY_JOY_UP      = $c8
 KEY_JOY_DOWN    = $e8
