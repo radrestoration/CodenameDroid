@@ -26,6 +26,7 @@ wait_frames:
     rts
 
 new_game:
+    jsr reset_surface_tiles
     ; the tile maps
     lda #<level_tiles0
     sta p1
@@ -142,6 +143,29 @@ set_level_go:
     rts
 
 NEW_GAME_PX = $c4               ; the BBC's start of a new game, under the ship
+
+; The surface's spaceship tiles become walls and rope on the first lift attempt.
+reset_surface_tiles:
+    lda #$35
+    sta level_xlat + 9
+    lda #$34
+    sta level_xlat + 10
+    lda #$36
+    sta level_xlat + 12
+    lda #$37
+    sta level_xlat + 13
+    rts
+
+set_surface_tiles:
+    lda #$10
+    sta level_xlat + 9
+    lda #$0f
+    sta level_xlat + 10
+    lda #$16
+    sta level_xlat + 12
+    lda #$14
+    sta level_xlat + 13
+    rts
 
 ; start_for_level: the player's place from init_px
 start_for_level:
@@ -294,7 +318,8 @@ lift_ride:
     beq :+
     clc
     rts
-:   lda carried
+:   jsr set_surface_tiles
+    lda carried
     bne :+
     clc
     rts

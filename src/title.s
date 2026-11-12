@@ -268,6 +268,7 @@ save_game:
 
 ; jump_to_saved: after new_game: the saved state and the lift of the saved place
 jump_to_saved:
+    jsr set_surface_tiles
     ldx #7
 :   lda saved_score,x
     sta score,x
