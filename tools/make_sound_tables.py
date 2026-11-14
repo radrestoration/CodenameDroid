@@ -1,4 +1,4 @@
-"""Tables for the SID sound driver (src/sound.s), and the model the tests check it against.
+"""Tables for the SID sound driver (hal/c64/sound.s), and the model the tests check it against.
 
 The BBC game makes sound with the OS's SOUND (OSWORD 7): per channel (0 = noise, 1-3 = tones) a note with an amplitude
 (a volume, or one of four envelopes), a pitch (quarter semitones: 53 = middle C, 89 = A 440) and a duration (1/20 s),

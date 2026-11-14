@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The loading screens (src/intro.s) from the original disc: build/c64/gen/intro_data.s.
+"""The loading screens (hal/c64/intro.s) from the original disc: build/c64/gen/intro_data.s.
 
 The BBC disc's front end shows, first, the MODE 7 instruction pages (the BASIC program DROID: tools/mode7.py runs its
 PRINT statements on a teletext screen and makes C64 text pages of them, in the C64's own character set), then, from the

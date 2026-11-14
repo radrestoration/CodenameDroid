@@ -6,25 +6,6 @@ newlvl:     .res 1
 arrive_mode: .res 1            ; 1 when the player arrives by lift (keeps the line)
 .segment "CODE"
 
-screen_off:
-    lda #$0b
-    sta $d011
-    rts
-screen_on:
-    lda #$1b
-    sta $d011
-    rts
-
-; wait_frames: A frames
-wait_frames:
-    clc
-    adc tick
-    sta zv
-:   lda tick
-    cmp zv
-    bne :-
-    rts
-
 new_game:
     jsr reset_surface_tiles
     ; the tile maps

@@ -38,12 +38,6 @@ tcount:     .res 1
 gk:         .res 1
 .segment "CODE"
 
-frame_wait:
-    lda tick
-:   cmp tick
-    beq :-
-    rts
-
 ; get_key: wait for a key press (after every key has been let go): its number
 get_key:
 @rel:
@@ -1099,8 +1093,7 @@ game_over:
     sta p_msb
     lda #1
     sta ready
-@sp: lda ready
-    bne @sp
+    HAL_WAIT_SHOWN
     lda t_w
     clc
     adc #4
@@ -1247,7 +1240,7 @@ restart_game:
     lda title_jump
     beq :+
     jsr jump_to_saved
-:   jmp main
+:   jmp hal_main
 
 game_completed:
     lda #7

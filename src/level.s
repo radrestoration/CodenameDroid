@@ -2,7 +2,6 @@
 
 .segment "BSS"
 tgmask:     .res 2
-charset_page: .res 1
 rows_page:  .res 1
 .segment "ZEROPAGE"
 mk:         .res 2
@@ -93,40 +92,7 @@ intern:
     sta BPAT + $600,y
     lda cb + 7
     sta BPAT + $700,y
-    lda #0
-    sta p5 + 1
-    tya
-    asl
-    rol p5 + 1
-    asl
-    rol p5 + 1
-    asl
-    rol p5 + 1
-    sta p5
-    lda p5 + 1
-    clc
-    adc charset_page
-    sta p5 + 1
-    lda charset_page
-    cmp #>STAGE_CHARSET
-    bne @write
-    sei
-    lda #$34
-    sta $01
-@write:
-    ldy #7
-:   ldx cb,y
-    lda conv_table,x
-    sta (p5),y
-    dey
-    bpl :-
-    lda charset_page
-    cmp #>STAGE_CHARSET
-    bne @done
-    lda #$35
-    sta $01
-    cli
-@done:
+    jsr hal_store_char          ; (the platform shows character Y: the BBC bytes are in cb and BPAT)
     inc nchars
     lda zv
     rts
@@ -686,40 +652,7 @@ set_char:
     sta BPAT + $600,y
     lda cb + 7
     sta BPAT + $700,y
-    lda #0
-    sta p5 + 1
-    tya
-    asl
-    rol p5 + 1
-    asl
-    rol p5 + 1
-    asl
-    rol p5 + 1
-    sta p5
-    lda p5 + 1
-    clc
-    adc charset_page
-    sta p5 + 1
-    lda charset_page
-    cmp #>STAGE_CHARSET
-    bne @write
-    sei
-    lda #$34
-    sta $01
-@write:
-    ldy #7
-:   ldx cb,y
-    lda conv_table,x
-    sta (p5),y
-    dey
-    bpl :-
-    lda charset_page
-    cmp #>STAGE_CHARSET
-    bne @done
-    lda #$35
-    sta $01
-    cli
-@done:
+    jsr hal_store_char          ; (the platform shows character Y: the BBC bytes are in cb and BPAT)
     rts
 
 ; load_level: the character set and ROWS for `level` (its tile map is in LTILES)
@@ -739,30 +672,7 @@ intern_reset:
     sta NXT
     lda #1
     sta nchars
-    lda lift_screen
-    beq @normal
-    lda #>STAGE_CHARSET
-    sta charset_page
-    ; the staging area holds the sprite blocks: the blank character must be cleared
-    php
-    sei
-    lda $01
-    pha
-    lda #$34
-    sta $01
-    lda #0
-    ldx #7
-:   sta STAGE_CHARSET,x
-    dex
-    bpl :-
-    pla
-    sta $01
-    plp
-    rts
-@normal:
-    lda #>CHARSET
-    sta charset_page
-    rts
+    jmp hal_charset_reset       ; (which character set the new characters go to)
 
 load_level:
     lda level

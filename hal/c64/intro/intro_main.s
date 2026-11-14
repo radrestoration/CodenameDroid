@@ -403,4 +403,4 @@ copy_pages:
     bne @l
     rts
 
-.include "../src/intro.s"
+.include "../intro.s"

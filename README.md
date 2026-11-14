@@ -81,6 +81,18 @@ It starts as the BBC disc does:
 On the wrist terminal: S and B charge the suit and the blaster, M shows the map, SPACE leaves. The joystick controls are
 provisional.
 
+## Apple II scrolling experiment
+
+This is a separate, early Apple IIe HGR experiment, **not an Apple IIgs port or a playable game**. It displays the
+top 192 lines of the original surface tiles in monochrome; Z/X or the left/right arrows move the viewport one cell.
+There is no player, enemy, sound, or smooth scrolling. Movement shifts the existing screen one cell and draws the
+newly exposed column; the initial view is a full redraw.
+
+Set `LINAPPLE` in `tools.cfg`, then run `./run-apple2-experiment.sh`. It builds the experiment and loads the `.apl`
+program directly into LinApple, not a bootable disk. `make test-apple2-experiment` checks the HGR bytes at multiple
+camera positions and scrolling in both directions with the headless 6502 simulator. The IIgs experiment will need a IIgs emulator and
+ROM separately; results from this 1 MHz Apple IIe HGR test do not measure IIgs Super Hi-Res performance.
+
 ## Running the BBC version
 
 The BBC game is rebuilt bit for bit from the disassembly (`bbc/`). From `bbc/`: `make run` starts b-em on the rebuilt disc
@@ -143,7 +155,7 @@ Keys are as in the controls table above.
   screen are made of characters too (a backdrop of tiles as level 12 / 13, the BBC's font as shared glyph characters, its
   sprites composited into the cells under them); the title is the BBC's own screen, taken from the BBC game running in
   `tools/bbcsim.py`, with the player walking on the spot and firing.
-- **Sound** is the SID driver (`src/sound.s`) with the BBC's sound calls (`sfx.s`).
+- **Sound** is the SID driver (`hal/c64/sound.s`) with the BBC's sound calls (`src/sfx.s`).
 
 ## Memory
 
@@ -172,11 +184,17 @@ level). The collisions with enemy fire, mines and the terminal are not in that t
 - The picture scrolls smoothly; the player, the enemies and the rules move a cell at a time as on the BBC, the bullets smoothly.
 - The screen shows 25 of the level's 32 rows (the camera), and 40 of its columns instead of 32.
 - Sprites do not overwrite the background, so a player or an enemy in front of a rope or a chain leaves it showing.
-- The title does not scroll in. The instruction pages, pictures and credits (`src/intro.s`) are a separate program,
-  `intro/` -> `build/c64/intro.prg`: it loads `GAME` over itself (`droid.d64` has both; `game.prg` starts at the title).
+- The title does not scroll in. The instruction pages, pictures and credits (`hal/c64/intro.s`) are a separate program,
+  `hal/c64/intro/` -> `build/c64/intro.prg`: it loads `GAME` over itself (`droid.d64` has both; `game.prg` starts at the title).
   The intro-to-game disk loading sequence has not yet been verified end to end.
 - A lift ride (`lift.s`) scrolls the 40 columns at the lift's end of the old and new levels past the fixed cabin and player.
   The new level is built into separate row/charset storage while the ride remains visible, then the display switches to the
   rebuilt level at landing without the former black rebuild.
 - Mines exploding use the cell of the mine, not the half cell the BBC may use; the pillars of the shrine's sector three kill by
   a test of the player's four points against the pillar's cells.
+
+## Source layout
+
+`src/` is the game logic, shared by every platform; `hal/<platform>/` is what a machine supplies (display, keyboard, sound,
+timing, start-up): `hal/c64/` (the program root is `hal/c64/game.s`), `hal/apple/gs/` (Apple IIgs, Super Hi-Res),
+`hal/apple/ii/` (Apple II HGR, an experiment) and `hal/apple/` for what they share. `hal/README.md` describes the contract.

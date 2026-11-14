@@ -125,11 +125,10 @@ lift_ride_scroll:
     sei
     jsr make_sprites
     lda #0
-    sta $d015                   ; no sprites while the ride's set overwrites the old sprite blocks
+    HAL_SPRITES_ENABLE          ; no sprites while the ride's set overwrites the old sprite blocks
     jsr lift_make_sprites
     sei
-    lda #$34
-    sta $01
+    HAL_RAM_UNDER_IO
     jsr intern_reset
     lda #>RIDE_CHARSET
     sta charset_page
@@ -219,8 +218,7 @@ lift_ride_scroll:
     jsr build_tg
     jsr fill_slabn
     ; the ride
-    lda #$35
-    sta $01
+    HAL_IO_VISIBLE
     cli
     lda #0
     sta rstep
@@ -335,8 +333,7 @@ lift_ride_scroll:
     sta lift_screen
 :   lda #1
     sta ready
-:   lda ready
-    bne :-
+    HAL_WAIT_SHOWN
     inc rstep                   ; (two rows a frame: a frame is not long enough to make the matrix twice)
     inc rstep
     lda rstep
@@ -415,8 +412,7 @@ blank_under_player:
 
 lift_make_sprites:
     sei
-    lda #$34
-    sta $01
+    HAL_RAM_UNDER_IO
     ldx #0
 @slot:
     stx lms_slot
@@ -471,10 +467,9 @@ lift_make_sprites:
     sta MAT_B + $3f8,x
     dex
     bpl :-
-    lda #$35
-    sta $01
+    HAL_IO_VISIBLE
     lda p_en
-    sta $d015
+    HAL_SPRITES_ENABLE
     cli
     rts
 
@@ -485,8 +480,7 @@ ride_sprite_ptr: .byte $7a, $7b, $7c
 lift_finish_view:
     ; Restore the new level's charset from staging while the ride charset is still displayed.
     sei
-    lda #$34
-    sta $01
+    HAL_RAM_UNDER_IO
     lda #<STAGE_CHARSET
     sta p1
     lda #>STAGE_CHARSET
@@ -506,8 +500,7 @@ lift_finish_view:
     inc p2 + 1
     dex
     bne @charset
-    lda #$35
-    sta $01
+    HAL_IO_VISIBLE
     cli
     lda #>CHARSET               ; the enemies' characters go to the live set from here
     sta charset_page
@@ -551,9 +544,7 @@ lift_finish_view:
     sta cur_buf
     lda #1
     sta ready
-@wait:
-    lda ready
-    bne @wait
+    HAL_WAIT_SHOWN
 
     sei
     jsr copy_sprites
@@ -563,9 +554,7 @@ lift_finish_view:
     jsr make_sprites
     lda #1
     sta ready
-@wait_sprites:
-    lda ready
-    bne @wait_sprites
+    HAL_WAIT_SHOWN
 
     lda lift_slot
     beq @draw_b
